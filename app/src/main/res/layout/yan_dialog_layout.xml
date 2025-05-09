@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_height="wrap_content"
+    android:layout_width="match_parent"
+    android:background="@drawable/malert"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:gravity="center|left">
+
+        <ImageView
+            android:layout_height="40dp"
+            android:layout_width="40dp"
+            android:background="@drawable/ic_code"
+            android:layout_marginRight="10dp"
+            android:layout_marginLeft="10dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="5dp"
+            />
+
+        <TextView
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:textSize="20sp"
+            android:textColor="@android:color/black"
+            android:id="@+id/dialog_title"
+            android:text="对话框标题" />
+
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_height="150dp"
+        android:layout_width="match_parent">
+
+        <TextView
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:textSize="16sp"
+            android:textColor="@android:color/black"
+            android:id="@+id/dialog_message"
+            android:layout_marginRight="10dp"
+            android:layout_marginLeft="10dp"
+            android:layout_marginBottom="10dp"
+            android:text="这是对话框的消息内容。" />
+
+    </ScrollView>
+
+</LinearLayout>

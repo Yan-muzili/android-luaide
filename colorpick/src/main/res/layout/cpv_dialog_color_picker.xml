@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_height="wrap_content"
+    android:layout_width="match_parent">
+
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:paddingRight="12dp"
+        android:orientation="vertical"
+        android:paddingBottom="0dp"
+        android:paddingLeft="12dp"
+        android:paddingTop="10dp">
+
+        <com.jaredrummler.android.colorpicker.ColorPickerView
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:contentDescription="四纬色块+色轮条+透明度"
+            android:padding="0dp"
+            style="@style/cpv_ColorPickerViewStyle"
+            android:id="@id/cpv_color_picker_view" />
+
+        <LinearLayout
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:gravity="center"
+            android:padding="5dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_height="match_parent"
+                android:layout_width="match_parent"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_height="wrap_content"
+                    android:layout_width="match_parent"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_height="wrap_content"
+                        android:layout_width="match_parent"
+                        android:gravity="left"
+                        android:layout_weight="1"
+                        android:layout_marginTop="0dp">
+
+                        <com.jaredrummler.android.colorpicker.ColorPanelView
+                            android:layout_height="@dimen/cpv_dialog_preview_height"
+                            android:layout_width="@dimen/cpv_dialog_preview_width"
+                            android:contentDescription="旧颜色块"
+                            app:cpv_colorShape="square"
+                            android:id="@id/cpv_color_panel_old" />
+
+                        <ImageView
+                            android:layout_height="wrap_content"
+                            android:layout_width="wrap_content"
+                            android:visibility="gone"
+                            android:src="@drawable/cpv_ic_arrow_right_black_24dp"
+                            android:paddingRight="4dp"
+                            android:paddingLeft="4dp"
+                            tools:ignore="ContentDescription"
+                            android:id="@+id/cpv_arrow_right"
+                            android:layout_gravity="center_vertical" />
+
+                        <com.jaredrummler.android.colorpicker.ColorPanelView
+                            android:layout_height="@dimen/cpv_dialog_preview_height"
+                            android:layout_width="@dimen/cpv_dialog_preview_width"
+                            android:contentDescription="新颜色块"
+                            app:cpv_colorShape="square"
+                            android:id="@id/cpv_color_panel_new" />
+
+                    </LinearLayout>
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:layout_height="wrap_content"
+                        android:layout_width="wrap_content"
+                        app:singleSelection="true"
+                        app:singleLine="true"
+                        android:id="@+id/myChipGroup"
+                        app:chipSpacing="0dp"
+                        app:selectionRequired="true">
+
+                        <com.google.android.material.chip.Chip
+                            android:layout_height="wrap_content"
+                            android:layout_width="wrap_content"
+                            style="@style/Widget.Material3.Chip.Filter"
+                            android:checked="true"
+                            android:id="@+id/hex"
+                            android:text="HEX" />
+
+                        <com.google.android.material.chip.Chip
+                            android:layout_height="wrap_content"
+                            android:layout_width="wrap_content"
+                            style="@style/Widget.Material3.Chip.Filter"
+                            android:id="@+id/rgba"
+                            android:text="RGBA" />
+
+                        <com.google.android.material.chip.Chip
+                            android:layout_height="wrap_content"
+                            android:layout_width="wrap_content"
+                            style="@style/Widget.Material3.Chip.Filter"
+                            android:id="@+id/hsla"
+                            android:visibility="gone"
+                            android:text="HSLA" />
+
+                    </com.google.android.material.chip.ChipGroup>
+
+
+                </LinearLayout>
+
+                <RelativeLayout
+                    android:layout_height="wrap_content"
+                    android:layout_width="match_parent">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_height="56dp"
+                        android:layout_width="match_parent"
+                        android:visibility="visible"
+                        android:layout_marginTop="5dp"
+                        android:id="@+id/cpv_hex_layout">
+
+                        <EditText
+                            android:layout_height="wrap_content"
+                            android:layout_width="match_parent"
+                            android:imeOptions="actionGo"
+                            android:hint="颜色代码-HEX"
+                            android:maxLength="8"
+                            android:typeface="monospace"
+                            android:maxLines="1"
+                            android:digits="#0123456789ABCDEFabcdef"
+                            android:focusable="true"
+                            android:inputType="textNoSuggestions"
+                            android:id="@+id/cpv_hex" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_height="56dp"
+                        android:layout_width="match_parent"
+                        android:visibility="gone"
+                        android:layout_marginTop="5dp"
+                        android:id="@+id/cpv_rgba_layout">
+
+                        <EditText
+                            android:layout_height="wrap_content"
+                            android:layout_width="match_parent"
+                            android:imeOptions="actionGo"
+                            android:hint="颜色代码-RGBA"
+                            android:maxLength="50"
+                            android:typeface="monospace"
+                            android:maxLines="1"
+                            android:digits="0123456789(. ,)rgbaRGBA"
+                            android:focusable="true"
+                            android:inputType="textNoSuggestions"
+                            android:id="@+id/cpv_rgba" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_height="56dp"
+                        android:layout_width="match_parent"
+                        android:visibility="gone"
+                        android:layout_marginTop="5dp"
+                        android:id="@+id/cpv_hsla_layout">
+
+                        <EditText
+                            android:layout_height="wrap_content"
+                            android:layout_width="match_parent"
+                            android:imeOptions="actionGo"
+                            android:hint="颜色代码-HSLA"
+                            android:maxLength="50"
+                            android:textSize="12sp"
+                            android:typeface="monospace"
+                            android:maxLines="1"
+                            android:digits="0123456789%(. ,)hslaHSLA"
+                            android:focusable="true"
+                            android:inputType="textNoSuggestions"
+                            android:id="@+id/cpv_hsla" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </RelativeLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>

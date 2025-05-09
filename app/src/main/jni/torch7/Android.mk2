@@ -1,0 +1,11 @@
+LOCAL_PATH := $(call my-dir)
+
+include $(CLEAR_VARS)
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../lua
+LOCAL_MODULE := libtorch
+LOCAL_SRC_FILES := DiskFile.c File.c MemoryFile.c PipeFile.c Storage.c Tensor.c Timer.c utils.c init.c TensorOperator.c TensorMath.c random.c Generator.c\
+	luaT.c \
+	THGeneral.c THHalf.c THAllocator.c THSize.c THStorage.c THTensor.c THBlas.c THLapack.c \
+    THLogAdd.c THRandom.c THFile.c THDiskFile.c THMemoryFile.c THAtomic.c THVector.c
+LOCAL_STATIC_LIBRARIES := luajava
+include $(BUILD_SHARED_LIBRARY)

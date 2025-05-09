@@ -1,0 +1,53 @@
+apply plugin: 'com.android.library'
+
+android {
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('D:\\Yan\\luaide\\release_key.jks')
+            storePassword "hhh12345"
+            keyAlias "yan"
+            keyPassword "hhh12345"
+        }
+        debug {
+            storeFile file('D:\\Yan\\luaide\\release_key.jks')
+            storePassword "hhh12345"
+            keyAlias "yan"
+            keyPassword "hhh12345"
+        }
+    }
+    resourcePrefix "cpv_"
+  
+  defaultConfig {
+  compileSdkVersion 34
+  namespace "com.jaredrummler.android.colorpicker"
+        // ... 其他配置 ...
+    minSdkVersion 21
+    targetSdkVersion 28
+   // namespace 'com.webs.colorpick'
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  
+  
+  implementation 'androidx.preference:preference:1.2.1'
+      // 安卓Xp
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+ 
+     // 谷歌
+    implementation 'com.google.android.material:material:1.12.0'
+}
+
+//apply from: rootProject.file('gradle/maven-push.gradle')
