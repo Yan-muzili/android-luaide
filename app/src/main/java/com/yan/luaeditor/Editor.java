@@ -8,6 +8,8 @@ import android.content.FileProvider;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.TypedArray;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -29,6 +31,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -54,18 +57,32 @@ import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.android.material.textfield.TextInputEditText;
+
+import com.topjohnwu.superuser.Shell;
+import com.topjohnwu.superuser.ShellUtils;
 import com.yan.luaeditor.tools.AndroidBug5497Workaround;
 import com.yan.luaeditor.tools.ClassMethodScanner;
 import com.yan.luaeditor.tools.CompleteHashmapUtils;
 import com.yan.luaeditor.tools.DrawableUtil;
 import com.yan.luaeditor.tools.PackageUtil;
+import com.yan.luaeditor.tools.ThemeSwitchHelper;
 import com.yan.luaeditor.tools.ThreadManager;
 import com.yan.luaeditor.tools.YanDialog;
 import com.yan.luaeditor.format.AutoIndent;
 import com.yan.luaeditor.tools.YanToast;
+import com.yan.luaeditor.tools.apk.ApkTools;
+import com.yan.luaeditor.tools.dep.Material3ProgressDialog;
+import com.yan.luaeditor.tools.dep.MavenDownloader;
+import com.yan.luaeditor.tools.dep.PomDownloader;
+import com.yan.luaeditor.tools.memorytool.MemoryTool;
 import com.yan.luaeditor.ui.ActivitySet;
 import com.yan.luaeditor.ui.FileTreeFragment;
+import com.yan.luaeditor.ui.MemoryTest;
 import com.yan.luaeditor.ui.ToolboxListFragment;
+import com.yan.luaeditor.vtl.VNodeUtils;
+import com.yan.luaeditor.vtl.Vtl2View;
+import com.yan.luaeditor.vtl.VtlLexer;
+import com.yan.luaeditor.vtl.VtlParser;
 import com.yan.luaide.LuaActivity;
 import com.yan.luaide.LuaUtil;
 import com.yan.luaide.R;
@@ -73,19 +90,28 @@ import com.yan.luaide.databinding.EditorActivityBinding;
 
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
+import io.github.rosemoe.sora.text.Content;
 import io.github.rosemoe.sora.widget.CodeEditor;
 import io.github.rosemoe.sora.widget.SelectionMovement;
 import lide.luaj.vm2.Globals;
 import lide.luaj.vm2.LuaTable;
 import lide.luaj.vm2.lib.jse.JsePlatform;
 import lide.luaj.vm2.LuaValue;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class Editor extends AppCompatActivity implements View.OnClickListener {
     /**
@@ -110,78 +136,56 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
     public String mdir;
     private PopupMenu popo;
     boolean isbin = false;
+    MemoryTool memoryTool = new MemoryTool();
+
     SharedPreferences sps;
     SharedPreferences.Editor ed;
-    HashMap<String, HashMap<String, CompletionName>> base;
+    HashMap<String, Object> base;
     HashMap<String, List<String>> classMap2;
     int bg, sc = 0;
+    private void updateTheme(){
+        SharedPreferences scheme = getSharedPreferences("EditorSet", Context.MODE_PRIVATE);
+        int bg = scheme.getInt("Background", 0);
+        int sc = scheme.getInt("Scheme", -1);
+        int themeResId = 0;
+        if (bg == 0) {
+            // Light theme
+            if (sc == 6) {
+                DynamicColors.applyToActivitiesIfAvailable(getApplication());
+            } else {
+                TypedArray lightThemes = getResources().obtainTypedArray(R.array.light_themes);
+                if (sc >= 0) {
+                    themeResId = lightThemes.getResourceId(sc, R.style.app_theme);
+                }
+                lightThemes.recycle();
+                setTheme(themeResId);
+            }
+        } else {
+            // Dark theme
+            if (sc == 6) {
+                DynamicColors.applyToActivitiesIfAvailable(getApplication());
+            } else {
+                TypedArray darkThemes = getResources().obtainTypedArray(R.array.dark_themes);
+                if (sc >= 0) {
+                    themeResId = darkThemes.getResourceId(sc, R.style.app_theme);
+                }
 
+                darkThemes.recycle();
+                setTheme(themeResId);
+            }
+        }
+    }
     /**
      * --------------------------
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+        updateTheme();
+
+
+        ThemeSwitchHelper.installTransition(this);
         super.onCreate(savedInstanceState);
-        SharedPreferences Scheme = getSharedPreferences("EditorSet", Context.MODE_PRIVATE);
-        if ((Scheme.getInt("Background", 0) == 0)) {
-            if ((Scheme.getInt("Scheme", -1)) != -1) {
-                switch (Scheme.getInt("Scheme", -1)) {
-                    case 0:
-                        setTheme(R.style.Theme_AndroidIDE_BlueWave);
-                        break;
-                    case 1:
-                        setTheme(R.style.Theme_AndroidIDE_SunnyGlow);
-                        break;
-                    case 2:
-                        setTheme(R.style.Theme_Material3_Blue_NoActionBar);
-                        break;
-                    case 3:
-                        setTheme(R.style.Theme_Material3_Green_NoActionBar);
-                        break;
-                    case 4:
-                        setTheme(R.style.Theme_Material3_Orange_NoActionBar);
-                        break;
-                    case 5:
-                        setTheme(R.style.Theme_Material3_Brown_NoActionBar);
-                        break;
-                    case 6:
-                        DynamicColors.applyToActivitiesIfAvailable(this.getApplication());
-                        break;
-                }
-                sc = (Scheme.getInt("Scheme", -1));
-                bg = 0;
-            }
-        } else {
-            if ((Scheme.getInt("Scheme", -1)) != -1) {
-                switch (Scheme.getInt("Scheme", -1)) {
-                    case 0:
-                        setTheme(R.style.Theme_AndroidIDE_BlueWave_Dark);
-                        break;
-                    case 1:
-                        setTheme(R.style.Theme_AndroidIDE_SunnyGlow_Dark);
-                        break;
-                    case 2:
-                        setTheme(R.style.Theme_Material3_Blue_Dark_NoActionBar);
-                        break;
-                    case 3:
-                        setTheme(R.style.Theme_Material3_Green_Dark_NoActionBar);
-                        break;
-                    case 4:
-                        setTheme(R.style.Theme_Material3_Orange_Dark_NoActionBar);
-                        break;
-                    case 5:
-                        setTheme(R.style.Theme_Material3_Brown_Dark_NoActionBar);
-                        break;
-                    case 6:
-                        DynamicColors.applyToActivitiesIfAvailable(this.getApplication());
-                        break;
-                }
-                sc = (Scheme.getInt("Scheme", -1));
-                bg = 1;
-            }
-        }
-
-
         binding = EditorActivityBinding.inflate(getLayoutInflater());
         requestStoragePermissions();
         try {
@@ -214,15 +218,14 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
         //mdir="/storage/emulated/0/Luaide/Projects/yan/main.lua";
         initView();
         initClick();
-        if (!new File(getFilesDir().getAbsolutePath() + "/complete.base").exists() || !new File(getFilesDir().getAbsolutePath() + "/complete2.base").exists()) {
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle("提示")
-                    .setMessage("是否初始化Luaide的代码补全")
-                    .setPositiveButton("确定", (dialog, which) -> {
+        try {
+            if (!new File(getFilesDir().getAbsolutePath() + "/complete.base").exists() || !new File(getFilesDir().getAbsolutePath() + "/complete2.base").exists()) {
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle("提示")
+                        .setMessage("是否初始化Luaide的代码补全")
+                        .setPositiveButton("确定", (dialog, which) -> {
 
-                        ThreadManager.runOnMainThread(new Runnable() {
-                            @Override
-                            public void run() {
+                            new Thread(() -> {
 
                                 ThreadManager.runOnUiThread(new Runnable() {
                                     @Override
@@ -232,75 +235,25 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
                                 });
                                 //MakeCompleteTree.scanClassesAndMethods(activity);
                                 try {
-                                    HashMap<String, List<String>> basemap = PackageUtil.load(Editor.this);
-                                    basemap.get("R$style").add("android.R$style");
-                                    for(String na:basemap.keySet()) {
-                                        for (String className : basemap.get(na)) {
-                                            try {
-                                                Class<?> clazz = Class.forName(className);
-                                                Class<?>[] classes = clazz.getClasses();
-                                                for (Class<?> innerClass : classes) {
-                                                    String fullInnerClassName = className + "$" + innerClass.getSimpleName();
-                                                    //newClassNames.add(fullInnerClassName);
-                                                    String[] ss=fullInnerClassName.split("\\.");
-                                                    String ccl="";
-                                                    if (ss.length > 0) {
-                                                        ccl  = ss[ss.length - 1];
-                                                    }
-                                                    if (basemap.get(ccl)!=null)
-                                                    basemap.get(ccl).add(fullInnerClassName);
-                                                }
-                                            } catch (ClassNotFoundException |
-                                                     NoClassDefFoundError | NoSuchMethodError e) {
-                                                // 打印错误信息，方便调试
-                                                System.err.println("Class not found: " + className);
-                                            }
-                                        }
 
-                                    }
-
-
-                                    List<String> allclassname = new ArrayList<>();
-                                    for (String list : basemap.keySet()) {
-                                        allclassname.addAll(basemap.get(list));
-                                    }
-
-                                    //LuaUtil.save2("/sdcard/Luaide/allclassname.log",allclassname.toString());
-                                    Editor.this.classMap2 = new HashMap<>();
-                                    for (String k : basemap.keySet()) {
-                                        List<String> strlist = new ArrayList<>();
-                                        for (String str : basemap.get(k)) {
-                                            if (str.startsWith("com.yan.luaide.R")){
-                                                strlist.add(str.replaceAll("\\$","."));
-                                                Editor.this.classMap2.put(str.replaceAll("com.yan.luaide.R\\$","R."),strlist);
-                                            } else if (str.contains("R$")) {
-                                                strlist.add(str.replaceAll("\\$","."));
-                                                Editor.this.classMap2.put(str.replaceAll("\\$","."),strlist);
-                                            }else {
-                                            strlist.add(str.replaceAll("\\$", "."));
-                                                Editor.this.classMap2.put(k.replaceAll("\\$", "."), strlist);
-                                            }
-                                        }
-
-                                    }
-
-// 分批处理类名
-                                    int batchSize = 1000;
-                                    Editor.this.base = new HashMap<>();
-                                    ClassMethodScanner scanner = new ClassMethodScanner();
-                                    for (int i = 0; i < allclassname.size(); i += batchSize) {
-                                        int endIndex = Math.min(i + batchSize, allclassname.size());
-                                        List<String> batch = allclassname.subList(i, endIndex);
-                                        HashMap<String, HashMap<String, CompletionName>> batchResult = scanner.scanClassesAndMethods(batch);
-                                        Editor.this.base.putAll(batchResult);
-                                        System.gc();
-                                    }
-                                    //LuaUtil.save2("/sdcard/Luaide/yyy.log",basemap.toString());
+                                    InitCompletion initCompletion = new InitCompletion(Editor.this);
+                                    classMap2 = initCompletion.getCM();
+                                    base = new InitCompletion(Editor.this).getClassTree(initCompletion.getClassNameList(classMap2));
+                                    LuaUtil.save2("/sdcard/Luaide/yyy.log", classMap2.toString());
                                     CompleteHashmapUtils.saveHashMapToFile(Editor.this, Editor.this.base, "complete.base");
                                     CompleteHashmapUtils.saveHashMapToFile2(Editor.this, Editor.this.classMap2, "complete2.base");
                                 } catch (Exception e) {
-                                    //YanDialog.show(Editor.this,"Error",e.getMessage());
-                                    System.out.println(e.getMessage());
+                                    ThreadManager.runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            YanDialog.show(Editor.this, "Error", e.getMessage());
+                                        }
+                                    });
+
+                                    //System.out.println(e.getMessage());
+                                } finally {
+
+
                                 }
                                 ThreadManager.runOnMainThread(new Runnable() {
                                     @Override
@@ -317,18 +270,79 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
                                         });
                                     }
                                 });
+                            }).start();
+                            dialog.dismiss();
+                        })
+                        .setNegativeButton("取消", (dialog, which) -> {
+                            dialog.dismiss();
+                        })
+                        .show();
+
+            } else {
+                base = CompleteHashmapUtils.loadHashMapFromFile(Editor.this, "complete.base");
+                classMap2 = CompleteHashmapUtils.loadHashMapFromFile2(Editor.this, "complete2.base");
+                //memoryTool.bindService(Editor.this);
+                //progressIndicator.setVisibility(View.VISIBLE);
+                new Thread(new Runnable() {
+                    @RequiresApi(api = Build.VERSION_CODES.P)
+                    @Override
+                    public void run() {
+                        ThreadManager.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                progressIndicator.setVisibility(View.VISIBLE);
+                            }
+
+                        });
+
+                        //System.out.println(mdir+"/libs");
+                        if (mdir != null) {
+                            if (new File(new File(mdir).getParent() + "/libs").exists()) {
+                                File[] libs = new File(new File(mdir).getParent() + "/libs").listFiles();
+                                //System.out.println(libs.toString());
+                                /*for (File f : libs) {
+                                    List<String> dex = ClassMethodScanner.getClassNames(f.getAbsolutePath());
+                                    for (String str : dex) {
+                                        //System.out.println(str);
+                                        String[] l = str.split("\\.");
+                                        if (l.length > 0) {
+                                            if (classMap2.get(l[l.length - 1].replaceAll("\\$", "\\.")) == null) {
+                                                classMap2.put(l[l.length - 1].replaceAll("\\$", "\\."),
+                                                        new ArrayList<>(Arrays.asList(str.replaceAll("\\$", "\\."))));
+                                            } else {
+                                                try {
+                                                    if (!classMap2.get(l[l.length - 1].replaceAll("\\$", "\\.")).contains(str.replaceAll("\\$", "\\.")))
+                                                        classMap2.get(l[l.length - 1].replaceAll("\\$", "\\.")).add(str.replaceAll("\\$", "\\."));
+
+                                                } catch (Exception e) {
+                                                    System.out.println(e.getMessage());
+                                                }
+                                            }
+                                        }
+                                    }
+                                    HashMap<String, HashMap<String, CompletionName>> class2 = new ClassMethodScanner().scanClassesAndMethods(dex, f.getAbsolutePath());
+                                    //LuaUtil.save2("/sdcard/Luaide/yyy.log",base.toString());
+                                    base.putAll(class2);
+
+
+                                }*/
+                            }
+                        }
+
+                        ThreadManager.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                progressIndicator.setVisibility(View.GONE);
                             }
                         });
-                        dialog.dismiss();
-                    })
-                    .setNegativeButton("取消", (dialog, which) -> {
-                        dialog.dismiss();
-                    })
-                    .show();
-        } else {
-            base = CompleteHashmapUtils.loadHashMapFromFile(this, "complete.base");
-            classMap2 = CompleteHashmapUtils.loadHashMapFromFile2(this, "complete2.base");
-            //LuaUtil.save2("/sdcard/Luaide/yyy.log",base+"\n"+classMap2);
+                    }
+                }).start();
+
+                //LuaUtil.save2("/sdcard/Luaide/yyy.log",ClassMethodScanner.getClassNames("/sdcard/Luaide/classes.dex").toString());
+
+            }
+        } catch (RuntimeException e) {
+            System.out.println(e);
         }
         setSupportActionBar(toolbar);
         if (mdir != null) {
@@ -375,10 +389,13 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
             return insets;
         });
         //SoftHideKeyBoardUtil.assistActivity(this);
+        //System.out.println(Shell.isAppGrantedRoot());
+
+
         setSupportActionBar(binding.toolbar);
         actionBarDrawerToggle = new ActionBarDrawerToggle(this, drawerLayout, binding.toolbar, 0, 0);
         drawerLayout.addDrawerListener(actionBarDrawerToggle);
-        drawerLayout.setScrimColor(android.graphics.Color.TRANSPARENT);
+        drawerLayout.setScrimColor(Color.TRANSPARENT);
         actionBarDrawerToggle.syncState();
         drawerLayout.addDrawerListener(new DrawerLayout.DrawerListener() {
             @Override
@@ -406,6 +423,8 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
             public void onTabSelected(TabLayout.Tab tab) {
                 pager_choice = tab.getPosition();
                 toolbar.setSubtitle(tab.getText());
+                ed.putString("OpenFile", fragments.get(pager_choice).fileName);
+                ed.commit();
             }
 
             @Override
@@ -449,7 +468,8 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
         func.add(1, 1, 0, "显示行号").setCheckable(true).setChecked(sps.getBoolean("linenumber", true));
         func.add(1, 2, 0, "固定行号").setCheckable(true).setChecked(sps.getBoolean("pin", false));
         func.add(1, 3, 0, "格式化代码").setIcon(R.drawable.format);
-        func.add(1,4,0,"搜索文本");
+        func.add(1, 4, 0, "搜索文本");
+        func.add(1, 5, 0, "parsertest");
         sign.add(2, 0, 0, "移到最后");
         sign.add(2, 1, 0, "左移");
         sign.add(2, 2, 0, "右移");
@@ -483,6 +503,7 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
                                         }
                                     });
                                     try {
+
                                         //startActivity(new Intent(this, LuaActivity.class).setData(Uri.fromFile(new File(new File(fragments.get(pager_choice).fileName).getPath()))));
                                         isbin = true;
                                         //new LuaActivity().doAsset("bin.lua");
@@ -519,6 +540,7 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
                                         if (!value.istable()) value = env.get("user_permission");
                                         if (value.istable()) {
                                             LuaTable tb = value.checktable();
+
                                             int len = tb.length();
                                             ps = new String[len];
                                             for (int i = 0; i < len; i++) {
@@ -625,10 +647,10 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
                                                 CharSequence text = editor.getText();
                                                 CharSequence charSequence = text;
                                                 CharSequence format = AutoIndent.format(charSequence, 4);
-                                                ((io.github.rosemoe.sora.text.Content) text).beginBatchEdit();
-                                                ((io.github.rosemoe.sora.text.Content) text).delete(0, text.length());
-                                                ((io.github.rosemoe.sora.text.Content) text).insert(0, 0, format);
-                                                ((io.github.rosemoe.sora.text.Content) text).endBatchEdit();
+                                                ((Content) text).beginBatchEdit();
+                                                ((Content) text).delete(0, text.length());
+                                                ((Content) text).insert(0, 0, format);
+                                                ((Content) text).endBatchEdit();
                                             }
                                         });
                                         editor.postInLifecycle(new Runnable() {
@@ -641,11 +663,90 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
                                                 }
                                             }
                                         });
+                                        //LuaUtil.save2("/sdcard/Luaide/ispid.log",memoryTool.getProcessPid("com.yan.luaide")+"");
+                                        /*memoryTool.searchMemory(memoryTool.getProcessPid("com.yan.luaide"), 999, new MemoryTool.OnSearchListener() {
+                                            @Override
+                                            public void onSuccess(int resultCount) {
+                                                LuaUtil.save2("/sdcard/Luaide/ispid.log",resultCount+"");
+                                            }
+
+                                            @Override
+                                            public void onFailure(String message) {
+                                                LuaUtil.save2("/sdcard/Luaide/ispid.log",message);
+                                            }
+                                        });*/
                                     }
                                 });
+                                //startActivity(new Intent(Editor.this, MemoryTest.class));
                                 break;
                             case 4:
                                 fragments.get(pager_choice).setSearchPanel(true);
+                                break;
+                            case 5:
+                                /*new Thread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        try {
+                                            InitCompletion initCompletion = new InitCompletion(Editor.this);
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                                HashMap<String,Object> map=initCompletion.getClassTree();
+                                                HashMap<String,String> varMap=new HashMap<>(),importMap=new HashMap<>();
+                                                //varMap.put("show","")
+                                                importMap.put("Builder","");
+                                                LuaUtil.save2("/sdcard/Luaide/new.log", initCompletion.getClassTree().toString());
+                                            }
+                                        } catch (Exception e) {
+                                            System.out.println(e.getMessage());
+                                        }
+                                    }
+                                }).start();*/
+                                //analyzeErrors(fragments.get(pager_choice).edit.getText().toString());
+                                Material3ProgressDialog dlg = new Material3ProgressDialog(Editor.this);
+                                dlg.show();
+                                PomDownloader downloader = new PomDownloader();
+                                downloader.setDownloadListener(new PomDownloader.DownloadListener() {
+                                    @Override
+                                    public void onProgress(String fileName, long current, long total) {
+                                        int pct = total > 0 ? (int)(current * 100 / total) : 0;
+                                        dlg.updateProgress1(pct);               // 当前文件
+                                        dlg.setMessage(fileName);               // 文件名
+
+                                    }
+                                    @Override
+                                    public void onFileFinished(String fileName) {
+                                        //dlg.dismiss();
+                                        //System.out.println(fileName);
+                                    }
+                                    @Override
+                                    public void onTotalProgress(String string,int finished, int total) {
+                                        dlg.updateTotalProgress(string,finished, total);
+                                    }
+                                });
+                                new Thread(() -> {
+                                    try {
+                                        List<File> deps = downloader.downloadTransitive(Editor.this,
+                                                "androidx.appcompat:appcompat:1.6.1");
+                                        for (File f : deps) {
+                                            //System.out.println("下载完成：" + f.getAbsolutePath());
+                                            try {
+                                                if (f.getAbsolutePath().endsWith("jar"))
+                                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                        new ApkTools().jar2dex(Editor.this,f.getAbsolutePath(), f.getAbsolutePath().replaceFirst(".jar", ".dex"));
+                                                    }
+                                            } catch (Exception e) {
+                                                System.out.println(e.getMessage());
+                                            }
+                                        }
+                                        runOnUiThread(dlg::dismiss);
+                                    } catch (Exception e) {
+                                        System.out.println(e.getMessage());
+                                        runOnUiThread(() -> {
+                                            dlg.setTitle("下载失败");
+                                            dlg.setMessage(e.getMessage());
+                                            //new android.os.Handler().postDelayed(dlg::dismiss, 3000);
+                                        });
+                                    }
+                                }).start();
                                 break;
                         }
                         break;
@@ -916,104 +1017,7 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
         startActivity(intent);
     }
 
-    /**
-     * 文件选择器
-     */
-    File currentDirectory = new File(String.valueOf(Environment.getExternalStorageDirectory()));
 
-    private void showFileChooserDialog() {
-        // 获取当前目录下的所有文件和文件夹
-        final List<String> fileNames = new ArrayList<>();
-        final List<String> filePaths = new ArrayList<>();
-        listFiles(currentDirectory, fileNames, filePaths);
-        // 将文件名和文件路径转换为File对象列表
-        List<File> files = new ArrayList<>();
-        for (String path : filePaths) {
-            files.add(new File(path));
-        }
-
-        // 自定义比较器，确保文件夹在文件之前
-        Comparator<File> customComparator =
-                (file1, file2) -> {
-                    boolean isDir1 = file1.isDirectory();
-                    boolean isDir2 = file2.isDirectory();
-
-                    // 如果两个都是文件夹或都是文件，按名称排序
-                    if (isDir1 == isDir2) {
-                        return file1.getName().compareToIgnoreCase(file2.getName());
-                    }
-
-                    // 如果一个是文件夹，另一个是文件，则文件夹排在前面
-                    return isDir1 ? -1 : 1;
-                };
-
-        // 对File对象列表进行排序
-        Collections.sort(files, customComparator);
-
-        // 将排序后的File对象列表转回String列表
-        List<String> sortedFileNames = new ArrayList<>();
-        List<String> sortedFilePaths = new ArrayList<>();
-        for (File file : files) {
-            sortedFileNames.add(file.getName());
-            sortedFilePaths.add(file.getPath());
-        }
-        // 创建文件选择对话框
-        // Toast.makeText(MainActivity.this,"",Toast.);
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
-        builder
-                .setTitle("选择文件")
-                .setItems(
-                        sortedFileNames.toArray(new String[0]),
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                // 用户点击文件时的处理逻辑
-                                String selectedFilePath = sortedFilePaths.get(which);
-                                File selectedFile = new File(selectedFilePath);
-                                if (selectedFile.isDirectory()) {
-                                    // 如果是文件夹，则进入文件夹
-                                    currentDirectory = selectedFile;
-                                    showFileChooserDialog(); // 递归显示文件选择对话框
-                                } else {
-                                    // 如果是文件，则处理文件的逻辑，例如打开文件等
-                                    Toast.makeText(Editor.this, "选择了文件：" + selectedFilePath, Toast.LENGTH_SHORT)
-                                            .show();
-                                    try {
-                                        Intent intent1 = new Intent(Editor.this, Editor.class);
-                                        intent1.putExtra("mdir", selectedFilePath);
-                                        startActivity(intent1);
-                                        finish();
-                                    } catch (Exception e) {
-                                        YanDialog.show(Editor.this, "error", e.getMessage());
-                                    }
-                                }
-                            }
-                        })
-                .setNegativeButton(
-                        "返回上层",
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                // 用户点击返回上层时的处理逻辑
-                                if (!currentDirectory.equals(Environment.getExternalStorageDirectory())) {
-                                    currentDirectory = currentDirectory.getParentFile();
-                                    showFileChooserDialog(); // 递归显示文件选择对话框
-                                }
-                            }
-                        })
-                .setNeutralButton(
-                        "取消",
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                // 用户点击取消时的处理逻辑
-                                dialog.dismiss();
-                                // 结束Activity
-                            }
-                        });
-        final AlertDialog alertDialog = builder.create();
-        alertDialog.show();
-    }
 
     /**
      *
@@ -1138,7 +1142,6 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
      * listfunc listFiles and setproject and getList
      */
 
-    // 获取文件和文件夹列表
     private void listFiles(File directory, List<String> fileNames, List<String> filePaths) {
         File[] files = directory.listFiles();
         if (files != null) {
@@ -1148,6 +1151,7 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
             }
         }
     }
+
     private void requestStoragePermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // 检查是否已经拥有所有文件的管理权限
@@ -1165,16 +1169,17 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(
-                        this, new String[] {Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
+                        this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
             }
 
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(
-                        this, new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+                        this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
             }
         }
     }
+
     public static void onRequestPermissionsResult(AppCompatActivity activity, int requestCode,
                                                   @NonNull String[] permissions,
                                                   @NonNull int[] grantResults) {
@@ -1190,7 +1195,6 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
                 Log.d("Permission", "All permissions granted");
             } else {
                 Log.d("Permission", "Some permissions denied");
-                // 可以在这里提示用户权限被拒绝的信息
             }
         }
     }
@@ -1206,12 +1210,15 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
     @Override
     public void onResume() {
         super.onResume();
-        SharedPreferences Scheme = getSharedPreferences("EditorSet", Context.MODE_PRIVATE);
+        /*SharedPreferences Scheme = getSharedPreferences("EditorSet", Context.MODE_PRIVATE);
         if (Scheme.getInt("Scheme", 0) != sc || Scheme.getInt("Background", 0) != bg) {
             for (int i = 0; i < fragments.size(); i++) {
                 removeTabAndFragment(i);
             }
             recreate();
         }
+
+         */
+        updateTheme();
     }
 }

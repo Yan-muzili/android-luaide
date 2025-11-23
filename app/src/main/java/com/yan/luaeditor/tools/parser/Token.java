@@ -2,7 +2,7 @@ package com.yan.luaeditor.tools.parser;
 
 public class Token {
     public enum TokenType {
-        IDENTIFIER, NUMBER, STRING, KEYWORD, OPERATOR, PUNCTUATION, EOF,WHITESPACE
+        IDENTIFIER, NUMBER, STRING, KEYWORD, OPERATOR, PUNCTUATION, EOF, NEWLINE, COMMENT, WHITESPACE
     }
 
     public TokenType type;

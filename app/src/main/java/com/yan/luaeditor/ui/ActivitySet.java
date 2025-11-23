@@ -1,10 +1,14 @@
 package com.yan.luaeditor.ui;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
+import android.os.RemoteException;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
@@ -21,11 +25,18 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.color.DynamicColors;
+import com.topjohnwu.superuser.ipc.RootService;
+import com.topjohnwu.superuser.nio.FileSystemManager;
 import com.yan.luaeditor.adapter.SetListAdapter;
+import com.yan.luaeditor.tools.memorytool.AIDLService;
+import com.yan.luaide.ILuaideMemoryTool;
 import com.yan.luaide.R;
 import com.yan.luaide.databinding.ActivitySetBinding;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ActivitySet extends AppCompatActivity {
@@ -95,6 +106,8 @@ public class ActivitySet extends AppCompatActivity {
         materialToolbar=binding.activitySetToolbar;
         recyclerView=binding.ideSetList;
         setSupportActionBar(materialToolbar);
+        Intent intent = new Intent(this, AIDLService.class);
+        RootService.bind(intent, new AIDLConnection(false));
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         setTitle("IDE设置");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -151,6 +164,52 @@ public class ActivitySet extends AppCompatActivity {
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
+        }
+    }
+    private AIDLConnection aidlConn;
+    private AIDLConnection daemonConn;
+    private FileSystemManager remoteFS;
+
+    class AIDLConnection implements ServiceConnection {
+
+        private final boolean isDaemon;
+
+        AIDLConnection(boolean b) {
+            isDaemon = b;
+        }
+
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+
+            if (isDaemon) {
+                daemonConn = this;
+            } else {
+                aidlConn = this;
+            }
+
+            ILuaideMemoryTool ipc = ILuaideMemoryTool.Stub.asInterface(service);
+            try {
+                int pid = ipc.getPid("com.yan.luaide");
+
+                //System.out.println(new AIDLService().BaseAddressSearch_DWORD("com.yan.luaide",999,22222222));
+                //System.out.println("AIDL PID : " + pid);
+                //AllTools.initUtil("com.yan.luaide");
+                //AllTools.setMemRange(MemRange.A);
+                //System.out.println(MemorySearch.rangeSearch(12345, DataType.DWORD));
+            } catch (RemoteException e) {
+
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+
+            if (isDaemon) {
+                daemonConn = null;
+            } else {
+                aidlConn = null;
+                remoteFS = null;
+            }
         }
     }
 }

@@ -23,6 +23,7 @@
  */
 package com.yan.luaeditor.lualanguage;
 
+import android.graphics.Color;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -39,7 +40,6 @@ import io.github.rosemoe.sora.lang.diagnostic.DiagnosticsContainer;
 import io.github.rosemoe.sora.lang.styling.CodeBlock;
 import io.github.rosemoe.sora.lang.styling.Span;
 import io.github.rosemoe.sora.lang.styling.SpanFactory;
-import io.github.rosemoe.sora.lang.styling.TextStyle;
 import io.github.rosemoe.sora.lang.styling.color.EditorColor;
 import io.github.rosemoe.sora.lang.styling.span.SpanClickableUrl;
 import io.github.rosemoe.sora.lang.styling.span.SpanExtAttrs;
@@ -48,6 +48,7 @@ import io.github.rosemoe.sora.text.ContentReference;
 import io.github.rosemoe.sora.util.ArrayList;
 import io.github.rosemoe.sora.util.IntPair;
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme;
+import io.github.rosemoe.sora.lang.styling.TextStyle;
 
 public class LuaIncrementalAnalyzeManager
         extends AsyncIncrementalAnalyzeManager<State, LuaIncrementalAnalyzeManager.HighlightToken> {
@@ -225,27 +226,26 @@ public class LuaIncrementalAnalyzeManager
      * @return state and offset
      */
     private long tryFillIncompleteComment(CharSequence line, List<HighlightToken> tokens) {
-        char pre = '\0', cur = '\0';
         int offset = 0;
-        while ((pre != ']' || cur != ']') && offset < line.length()) {
-            pre = cur;
-            cur = line.charAt(offset);
+        while (offset < line.length() && line.charAt(offset) != ']') {
             offset++;
         }
-        if (pre == ']' && cur == ']') {
-            if (offset < 1000) {
-                detectHighlightUrls(line.subSequence(0, offset), 0, Tokens.LONG_COMMENT_COMPLETE, tokens);
-            } else {
-                tokens.add(new HighlightToken(Tokens.LONG_COMMENT_COMPLETE, 0));
-            }
-            return IntPair.pack(STATE_NORMAL, offset);
+
+
+        int closeOffset = offset + 1;
+        int closeEqCount = 0;
+        while (closeOffset < line.length() && line.charAt(closeOffset) == '=') {
+            closeEqCount++;
+            closeOffset++;
         }
-        if (offset < 1000) {
-            detectHighlightUrls(line.subSequence(0, offset), 0, Tokens.LONG_COMMENT_INCOMPLETE, tokens);
+        //System.out.println(new State().longCommentEqualCount);
+        if (closeOffset < line.length() && line.charAt(closeOffset) == ']') {
+            tokens.add(new HighlightToken(Tokens.LONG_COMMENT_COMPLETE, 0));
+            return IntPair.pack(STATE_NORMAL, closeOffset + 1);
         } else {
             tokens.add(new HighlightToken(Tokens.LONG_COMMENT_INCOMPLETE, 0));
+            return IntPair.pack(STATE_INCOMPLETE_COMMENT, line.length());
         }
-        return IntPair.pack(STATE_INCOMPLETE_COMMENT, offset);
     }
 
     private int tokenizeNormal(CharSequence text, int offset, List<HighlightToken> tokens, State st) {
@@ -260,6 +260,7 @@ public class LuaIncrementalAnalyzeManager
                             || token == Tokens.LONG_COMMENT_INCOMPLETE || token == Tokens.LINE_COMMENT)) {
                 // detect possible URLs, if the token is not too long
                 detectHighlightUrls(tokenizer.getTokenText(), tokenizer.offset, token, tokens);
+                // 在 tokenizeNormal() 中
                 if (token == Tokens.LONG_COMMENT_INCOMPLETE) {
                     state = STATE_INCOMPLETE_COMMENT;
                     break;
@@ -281,21 +282,95 @@ public class LuaIncrementalAnalyzeManager
         return state;
     }
 
-    private void detectHighlightUrls(
-            CharSequence tokenText, int offset, Tokens token, List<HighlightToken> tokens) {
-        var matcher = URL_PATTERN.matcher(tokenText);
-        var index = 0;
-        while (index < tokenText.length() && matcher.find(index)) {
-            var start = matcher.start();
-            var end = matcher.end();
-            if (start > index) {
-                tokens.add(new HighlightToken(token, offset + index));
+    private static final int ST_NORMAL = 0;
+    private static final int ST_COLOR = 1;
+    private static final int ST_URL = 2;
+
+    /**
+     * 零拷贝扫描：逐字符把一个字符串 token 拆成
+     * 普通文本 / URL / 颜色字面量 三种子 token
+     */
+    private void tokenizeStringToken(CharSequence text, int baseOffset,
+                                     Tokens parentToken, List<HighlightToken> out) {
+        int len = text.length();
+        StringBuilder buf = new StringBuilder(len);
+        int start = 0;                 // 当前普通 token 的起点
+        int i = 0;
+        StringBuilder sb=new StringBuilder();
+        while (i < len) {
+            char c = text.charAt(i);
+
+            /* ---------- 颜色字面量：#RGB 或 #RRGGBB ---------- */
+            if (startsWith(text, i, "#")) {
+                int cEnd = i + 1;
+                while (cEnd < len && isHexDigit(text.charAt(cEnd))&& cEnd - i <= 8) cEnd++;
+
+                if (i > start) {
+                    buf.setLength(0);
+                    buf.append(text, start, i);
+                    out.add(new HighlightToken(parentToken, baseOffset + start));
+                }
+                out.add(new HighlightToken(parentToken,
+                        baseOffset + i,null, text.subSequence(i, cEnd).toString()));
+                i = cEnd;
+                start = i;
+                continue;
             }
-            tokens.add(new HighlightToken(token, offset + start, matcher.group()));
-            index = end;
+
+
+            /* ---------- URL：以 http/https 开头 ---------- */
+            if (startsWith(text, i, "http://") || startsWith(text, i, "https://")) {
+                int urlEnd = i + 7;          // 跳过 http://
+                while (urlEnd < len && !isUrlStop(text.charAt(urlEnd))) urlEnd++;
+
+                if (i > start) {
+                    buf.setLength(0);
+                    buf.append(text, start, i);
+                    out.add(new HighlightToken(parentToken, baseOffset + start));
+                }
+                out.add(new HighlightToken(parentToken,
+                        baseOffset + i, text.subSequence(i, urlEnd).toString()));
+                i = urlEnd;
+                start = i;
+                continue;
+            }
+
+            i++;
         }
-        if (index != tokenText.length()) {
-            tokens.add(new HighlightToken(token, offset + index));
+
+        // 剩余普通文本
+        if (start < len) {
+            out.add(new HighlightToken(parentToken, baseOffset + start));
+        }
+    }
+
+    /* 工具 */
+    private static boolean isHexDigit(char c) {
+        return (c >= '0' && c <= '9') ||
+                (c >= 'a' && c <= 'f') ||
+                (c >= 'A' && c <= 'F');
+    }
+
+    private static boolean startsWith(CharSequence s, int idx, String prefix) {
+        int len = prefix.length();
+        if (idx + len > s.length()) return false;
+        for (int i = 0; i < len; i++) {
+            if (s.charAt(idx + i) != prefix.charAt(i)) return false;
+        }
+        return true;
+    }
+
+    private static boolean isUrlStop(char c) {
+        return Character.isWhitespace(c) || c == '"' || c == '\'' || c == ')' || c == '}' || c == ']';
+    }
+
+    private void detectHighlightUrls(CharSequence tokenText,
+                                     int offset, Tokens token,
+                                     List<HighlightToken> tokens) {
+        try {
+            tokenizeStringToken(tokenText, offset, token, tokens);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
         }
     }
 
@@ -331,7 +406,7 @@ public class LuaIncrementalAnalyzeManager
                     span =
                             SpanFactory.obtain(
                                     offset,
-                                    TextStyle.makeStyle(EditorColorScheme.OPERATOR, 0, true, false, false));
+                                    TextStyle.makeStyle(EditorColorScheme.OPERATOR, 0, true, false, false,false));
 
                     break;
                 case IF:
@@ -416,6 +491,7 @@ public class LuaIncrementalAnalyzeManager
                                     offset,
                                     TextStyle.makeStyle(EditorColorScheme.COMMENT, 0, false, true, false, true));
                     break;
+
                 default:
                     if (isOperator(token)) {
                         span = SpanFactory.obtain(offset, TextStyle.makeStyle(EditorColorScheme.OPERATOR));
@@ -426,6 +502,18 @@ public class LuaIncrementalAnalyzeManager
             if (tokenRecord.url != null) {
                 span.setSpanExt(SpanExtAttrs.EXT_INTERACTION_INFO, new SpanClickableUrl(tokenRecord.url));
                 span.setUnderlineColor(new EditorColor(span.getForegroundColorId()));
+            }
+            try {
+                if (tokenRecord.colorHex != null) {
+                    int color;
+
+                    color = android.graphics.Color.parseColor(tokenRecord.colorHex);
+
+                    System.out.println(color);
+                    span.setUnderlineColor(color);
+                }
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
             }
             spans.add(span);
             previous = token;
@@ -460,6 +548,17 @@ public class LuaIncrementalAnalyzeManager
             case AT:
             case XOR:
             case QUESTION:
+            case EQEQ:
+            case LTEQ:
+            case GTEQ:
+            case DOTEQ:
+            case LTLT:
+            case LTGT:
+            case CLT:
+            case AEQ:
+            case GTGT:
+            case ARROW:
+            case OP:
                 return true;
             default:
                 return false;
@@ -471,10 +570,16 @@ public class LuaIncrementalAnalyzeManager
         public Tokens token;
         public int offset;
         public String url;
+        public String colorHex;
 
         public HighlightToken(Tokens token, int offset) {
             this.token = token;
             this.offset = offset;
+        }
+
+        public HighlightToken(Tokens token, int offset, String url, String colorHex) {
+            this(token, offset, url);
+            this.colorHex = colorHex;
         }
 
         public HighlightToken(Tokens token, int offset, String url) {

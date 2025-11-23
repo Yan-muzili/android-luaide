@@ -3,8 +3,10 @@ package com.yan.luaeditor;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
@@ -14,7 +16,7 @@ import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.PopupMenu;
@@ -23,6 +25,12 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.luaparser.ErrorLocationHelper;
+import com.luaparser.parser.ParseState;
+import com.yan.luaeditor.adapter.MyCompletionAdapter;
+import com.yan.luaeditor.format.LuaLexer;
+import com.yan.luaeditor.format.LuaTokenTypes;
 import com.yan.luaeditor.lualanguage.LuaLanguage;
 import com.yan.luaeditor.scheme.SchemeAtom;
 import com.yan.luaeditor.scheme.SchemeGitHubDark;
@@ -31,10 +39,11 @@ import com.yan.luaeditor.scheme.SchemeSublime;
 import com.yan.luaeditor.scheme.SchemeVimDark;
 import com.yan.luaeditor.scheme.SchemeWebStormDark;
 import com.yan.luaeditor.scheme.YluaScheme;
-import com.yan.luaeditor.tools.ClassMethodScanner;
-import com.yan.luaeditor.tools.PackageUtil;
+import com.yan.luaeditor.tools.SoraDiagnosticUtils;
 import com.yan.luaeditor.tools.ThreadManager;
 import com.yan.luaeditor.tools.YanDialog;
+import com.yan.luaeditor.tools.parser.LuaParser;
+import com.yan.luaeditor.tools.parser.Token;
 import com.yan.luaide.R;
 
 import java.io.BufferedReader;
@@ -44,11 +53,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.PatternSyntaxException;
 
+import io.github.rosemoe.sora.event.ContentChangeEvent;
+import io.github.rosemoe.sora.event.EventManager;
+import io.github.rosemoe.sora.event.SelectionChangeEvent;
+import io.github.rosemoe.sora.lang.diagnostic.DiagnosticsContainer;
 import io.github.rosemoe.sora.widget.CodeEditor;
 import io.github.rosemoe.sora.widget.EditorSearcher;
 import io.github.rosemoe.sora.widget.SelectionMovement;
@@ -83,9 +97,11 @@ public class FileContentFragment extends Fragment {
     String[] equivalents = null;
     LuaLanguage language;
     PopupMenu searchMenu;
-    Button search_options;
+    Button search_options, gotonext, gotolast, replaceall, replases;
     EditorSearcher.SearchOptions searchOptions = new EditorSearcher.SearchOptions(false, false);
-
+    io.github.rosemoe.sora.widget.component.EditorTextActionWindow editorTextActionWindow;
+    Editor activity;
+    HashMap<String, String> importmap = new HashMap<>();
     public static FileContentFragment newInstance() {
         return new FileContentFragment();
     }
@@ -100,8 +116,46 @@ public class FileContentFragment extends Fragment {
         binding = FragmentBinding.inflate(getLayoutInflater());
         View view = binding.getRoot();
         init();
+
+
         //setSearchPanel(true);
         return view;
+    }
+
+    public void gotoNext() {
+        try {
+            edit.getSearcher().gotoNext();
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void gotoPrev() {
+        try {
+            edit.getSearcher().gotoPrevious();
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void replace() {
+        try {
+            edit
+                    .getSearcher()
+                    .replaceThis(binding.replaceEditor.getText().toString());
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void replaceAll() {
+        try {
+            edit
+                    .getSearcher()
+                    .replaceAll(binding.replaceEditor.getText().toString());
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -140,8 +194,196 @@ public class FileContentFragment extends Fragment {
         super.onResume();
     }
 
+    private void onSelectChange(SelectionChangeEvent event) {
+        //if (event.isSelected()){
+        //Toast.makeText(getActivity(),"change",Toast.LENGTH_SHORT).show();
+        //}
+        editorTextActionWindow.getView().findViewById(R.id.panel_btn_analyze).setVisibility(event.isSelected() ? View.VISIBLE : View.GONE);
+        editorTextActionWindow.getView().findViewById(R.id.panel_btn_search).setVisibility(event.isSelected() ? View.VISIBLE : View.GONE);
+        //onContentChangeEvent();
+    }
+    com.luaparser.LuaParser.API api=com.luaparser.LuaParser.create();
+    private void onContentChangeEvent(){
+        ThreadManager.runOnMainThread(new Runnable() {
+            @Override
+            public void run() {
+                DiagnosticsContainer diagnosticsContainer=new DiagnosticsContainer();
+
+                //System.out.println(edit.getText().toString());
+
+                //
+                //ParserState result = com.luaparser.LuaParser.compile(edit.getText().toString(), "Lua", "Lua 5.4", null);
+                try {
+                    ParseState result = api.compile(edit.getText().toString(), "Lua", "Lua 5.3", null);
+                    List<ErrorLocationHelper.ErrorLocation> locations=ErrorLocationHelper.getErrorLocations(result);
+                    for (int i = 0; i < result.getErrors().size(); i++) {
+                        SoraDiagnosticUtils.addDiagnostic(diagnosticsContainer,result.getErrors().get(i).getStart(),result.getErrors().get(i).getFinish(),result.getErrors().get(i).getType(),locations.get(i).getError().getMessage(),null);
+                    }
+                    edit.setDiagnostics(diagnosticsContainer);
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
+
+            }
+        });
+
+    }
+
+    int position = 0;
+
+    private void initEditorFun() {
+        editorTextActionWindow.getView().findViewById(R.id.panel_btn_analyze).setOnClickListener(v -> {
+            LuaLexer lexer = new LuaLexer(edit.getText().toString());
+            LuaTokenTypes tokenType;
+            position = 0;
+            String afterString = null;
+            while (true) {
+                try {
+                    if ((tokenType = lexer.advance()) == null) break;
+
+                    String tokenValue = lexer.yytext();
+                    //position += tokenValue.length() + 1;
+                    if (afterString != null && afterString.equals("require") && tokenValue.equals("\"import\"")) {
+                        position++;
+                        break;
+                    }
+                    if (tokenType == LuaTokenTypes.NAME || tokenType == LuaTokenTypes.STRING)
+                        afterString = tokenValue;
+                    if (tokenType == LuaTokenTypes.NEW_LINE) position++;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            com.yan.luaeditor.tools.parser.LuaLexer lexer2;
+            List<Token> tokens = null;
+            try {
+                lexer2 = new com.yan.luaeditor.tools.parser.LuaLexer(edit.getText().toString());
+                tokens = lexer2.tokenize();
+            } catch (RuntimeException e) {
+                System.out.println(e.getMessage());
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+            LuaParser parser = new LuaParser(tokens);
+            importmap = new HashMap<>();
+            //long startTime = System.currentTimeMillis();
+
+            for (String str : parser.parseImports()) {
+                String ss = str.replace(".*", "");
+                for (String key : new InitCompletion(activity).getClassNameList(activity.classMap2)) {
+                    if (key.startsWith(ss)) {
+                        importmap.put(key, key);
+                    }
+                }
+            }
+            if (edit.getCursor().isSelected()) {
+                String selectedText = edit.getText().substring(
+                        edit.getCursor().getLeft(),
+                        edit.getCursor().getRight()
+                );
+
+                // 检查是否已导入
+                String foundImport = null;
+                for (String imp : importmap.keySet()) {
+                    String[] nameParts = imp.split("\\.");
+                    if (nameParts[nameParts.length - 1].equals(selectedText)) {
+                        foundImport = imp;
+                        break;
+                    }
+                }
+
+                // 处理结果
+                MaterialAlertDialogBuilder dialogBuilder = new MaterialAlertDialogBuilder(getActivity());
+
+                if (foundImport != null) {
+                    dialogBuilder.setTitle("分析结果")
+                            .setMessage("已导入该类: " + foundImport)
+                            .show();
+                } else {
+                    List<String> availableClasses = activity.classMap2.get(selectedText);
+                    if (availableClasses != null && !availableClasses.isEmpty()) {
+                        String[] classArray = availableClasses.toArray(new String[0]);
+                        dialogBuilder.setTitle("选择要导入的类")
+                                .setItems(classArray, (dialog, i) -> {
+                                    edit.getText().insert(position, 0, "\nimport \"" + classArray[i] + "\"\n");
+                                })
+                                .show();
+                    } else {
+                        Toast.makeText(getActivity(), "无此类", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            } else {
+                Toast.makeText(getActivity(), "请先选中要分析的类", Toast.LENGTH_SHORT).show();
+            }
+
+            //AlertDialog alertDialog=new AlertDialog(materialAlertDialogBuilder).create();
+            //Toast.makeText(getActivity(),activity.classMap2.get(string).get(0),Toast.LENGTH_SHORT).show();
+        });
+        editorTextActionWindow.getView().findViewById(R.id.panel_btn_search).setOnClickListener(v -> {
+            if (edit.getCursor().isSelected()) {
+                setSearchPanel(true);
+            }
+        });
+        EditorAutoCompletion component = edit.getComponent(EditorAutoCompletion.class);
+        MyCompletionAdapter adapter1 = new MyCompletionAdapter();
+        adapter1.setOnItemClickListener((label, desc, pos) -> {
+            com.yan.luaeditor.tools.parser.LuaLexer lexer2;
+            List<Token> tokens = null;
+            try {
+                lexer2 = new com.yan.luaeditor.tools.parser.LuaLexer(edit.getText().toString());
+                tokens = lexer2.tokenize();
+            } catch (RuntimeException e) {
+                System.out.println(e.getMessage());
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+            LuaParser parser = new LuaParser(tokens);
+            importmap = new HashMap<>();
+            //long startTime = System.currentTimeMillis();
+            for (String str : parser.parseImports()) {
+                String ss = str.replace(".*", "");
+                for (String key : new InitCompletion(activity).getClassNameList(activity.classMap2)) {
+                    if (key.startsWith(ss)) {
+                        importmap.put(key, key);
+                    }
+                }
+            }
+            component.select(pos);
+
+            if (importmap != null && importmap.get(desc) == null) {
+                LuaLexer lexer = new LuaLexer(edit.getText().toString());
+                LuaTokenTypes tokenType;
+                position = 0;
+                String afterString = null;
+                while (true) {
+                    try {
+                        if ((tokenType = lexer.advance()) == null) break;
+
+                        String tokenValue = lexer.yytext();
+                        //position += tokenValue.length() + 1;
+                        if (afterString != null && afterString.equals("require") && tokenValue.equals("\"import\"")) {
+                            position++;
+                            break;
+                        }
+                        if (tokenType == LuaTokenTypes.NAME || tokenType == LuaTokenTypes.STRING)
+                            afterString = tokenValue;
+                        if (tokenType == LuaTokenTypes.NEW_LINE) position++;
+                    } catch (IOException e) {
+                        //throw new RuntimeException(e);
+                    }
+                }
+                edit.getText().insert(position, 0, "\nimport \"" + desc + "\"\n");
+                //component.select(pos);
+
+            }
+
+            //edit.insertText(label, label.length());
+        });
+        component.setAdapter(adapter1);
+    }
+
     public void init() {
-        Editor activity = (Editor) getActivity();
+        activity = (Editor) getActivity();
 
         edit = binding.activityMainioGithubRosemoeSoraWidgetCodeEditor;
         //sym = binding.symbolInput;
@@ -152,6 +394,32 @@ public class FileContentFragment extends Fragment {
         llBottom = binding.llBottom;
         root = binding.root;
         search_options = binding.searchOptions;
+        replases = binding.replace;
+        gotolast = binding.gotoLast;
+        gotonext = binding.gotoNext;
+        replaceall = binding.replaceAll;
+        editorTextActionWindow = edit.getComponent(io.github.rosemoe.sora.widget.component.EditorTextActionWindow.class);
+        //System.out.println(activity.classMap2);
+
+        edit.subscribeAlways(SelectionChangeEvent.class, event -> onSelectChange(event));
+        edit.subscribeAlways(ContentChangeEvent.class, event -> onContentChangeEvent());
+        initEditorFun();
+        search.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+                tryCommitSearch();
+            }
+        });
         searchMenu = new PopupMenu(activity, search_options);
         searchMenu.inflate(R.menu.menu_search_options);
         searchMenu.setOnMenuItemClickListener(
@@ -177,6 +445,18 @@ public class FileContentFragment extends Fragment {
                 searchMenu.show();
             }
         });
+        gotonext.setOnClickListener(view -> {
+            gotoNext();
+        });
+        gotolast.setOnClickListener(view -> {
+            gotoPrev();
+        });
+        replases.setOnClickListener(view -> {
+            replace();
+        });
+        replaceall.setOnClickListener(view -> {
+            replaceAll();
+        });
         //sym.bindEditor(edit);
         sps = getActivity().getSharedPreferences("EditorSet", Context.MODE_PRIVATE);
 
@@ -197,57 +477,15 @@ public class FileContentFragment extends Fragment {
 
         if (activity.base == null) {
             try {
-                HashMap<String, List<String>> basemap = PackageUtil.load(activity);
-                basemap.get("R$style").add("android.R$style");
-                for(String na:basemap.keySet()) {
-                    for (String className : basemap.get(na)) {
-                        try {
-                            Class<?> clazz = Class.forName(className);
-                            Class<?>[] classes = clazz.getClasses();
-                            for (Class<?> innerClass : classes) {
-                                String fullInnerClassName = className + "$" + innerClass.getSimpleName();
-                                //newClassNames.add(fullInnerClassName);
-                                String[] ss=fullInnerClassName.split("\\.");
-                                String ccl="";
-                                if (ss.length > 0) {
-                                    ccl  = ss[ss.length - 1];
-                                }
-                                if (basemap.get(ccl)!=null)
-                                    basemap.get(ccl).add(fullInnerClassName);
-                            }
-                        } catch (ClassNotFoundException |
-                                 NoClassDefFoundError e) {
-                            // 打印错误信息，方便调试
-                            System.err.println("Class not found: " + className);
-                        }
-                    }
 
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    InitCompletion initCompletion = new InitCompletion(activity);
+                    activity.classMap2 = initCompletion.getCM();
+                    activity.base = new InitCompletion(activity).getClassTree(initCompletion.getClassNameList(activity.classMap2));
                 }
 
-
-                List<String> allclassname = new ArrayList<>();
-                for (String list : basemap.keySet()) {
-                    allclassname.addAll(basemap.get(list));
-                }
-                activity.classMap2 = new HashMap<>();
-                for (String k : basemap.keySet()) {
-                    List<String> strlist = new ArrayList<>();
-                    for (String str : basemap.get(k)) {
-                        if (str.startsWith("com.yan.luaide.R")){
-                            strlist.add(str.replaceAll("\\$","."));
-                            activity.classMap2.put(str.replaceAll("com.yan.luaide.R\\$","R."),strlist);
-                        } else if (str.contains("R$")) {
-                            strlist.add(str.replaceAll("\\$","."));
-                            activity.classMap2.put(str.replaceAll("\\$","."),strlist);
-                        }else {
-                            strlist.add(str.replaceAll("\\$", "."));
-                            activity.classMap2.put(k.replaceAll("\\$", "."), strlist);
-                        }
-                    }
-
-                }
-                activity.base = new ClassMethodScanner().scanClassesAndMethods(allclassname);
-                language = new LuaLanguage(activity.base, activity.classMap2);
+                language = new LuaLanguage(activity.base, activity.classMap2, new InitCompletion(activity).getClassNameList(activity.classMap2));
+                language.setLayoutPath(new File(activity.mdir).getParent() + "/layout");
                 var typeface = Typeface.createFromAsset(activity.getAssets(), "JetBrainsMono-Regular.ttf");
                 edit.setTypefaceText(typeface);
                 edit.setTypefaceLineNumber(typeface);
@@ -264,7 +502,8 @@ public class FileContentFragment extends Fragment {
 
         } else {
             try {
-                language = new LuaLanguage(activity.base, activity.classMap2);
+                language = new LuaLanguage(activity.base, activity.classMap2, new InitCompletion(activity).getClassNameList(activity.classMap2));
+                language.setLayoutPath(new File(activity.mdir).getParent() + "/layout");
                 var typeface = Typeface.createFromAsset(activity.getAssets(), "JetBrainsMono-Regular.ttf");
                 edit.setTypefaceText(typeface);
                 //edit.setTypefaceLineNumber(typeface);
@@ -418,7 +657,6 @@ public class FileContentFragment extends Fragment {
     }
 
 
-
     public String getFileName() {
         return new File(fileName).getName();
     }
@@ -457,9 +695,13 @@ public class FileContentFragment extends Fragment {
                 new MenuItem.OnMenuItemClickListener() {
                     @Override
                     public boolean onMenuItemClick(MenuItem arg0) {
-                        if (arg0.getItemId() == R.id.search_option_close) {
-                            setSearchPanel(false);
-                        }
+                        //if (arg0.getItemId() == R.id.search_option_close) {
+                        //setSearchPanel(false);
+                        //}
+                        binding.searchEditor.setText("");
+                        binding.replaceEditor.setText("");
+                        edit.getSearcher().stopSearch();
+                        setSearchPanel(false);
                         return false;
                     }
                 });
@@ -471,6 +713,7 @@ public class FileContentFragment extends Fragment {
         if (query.length() > 0) {
             try {
                 edit.getSearcher().search(query.toString(), searchOptions);
+                //binding.searchEditor.requestFocus();
             } catch (PatternSyntaxException e) {
                 // Regex error
             }
@@ -500,6 +743,11 @@ public class FileContentFragment extends Fragment {
         if (isshow) {
             searchPanel.setVisibility(View.VISIBLE);
             llBottom.setVisibility(View.GONE);
+            if (edit.getCursor().isSelected()) {
+                binding.searchEditor.setText(edit.getText().substring(edit.getCursor().getLeft(), edit.getCursor().getRight()));
+            }
+            computeSearchOptions();
+            tryCommitSearch();
             searchPanel.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
                 @Override
                 public void onGlobalLayout() {
@@ -517,6 +765,8 @@ public class FileContentFragment extends Fragment {
         } else {
             searchPanel.setVisibility(View.GONE);
             llBottom.setVisibility(View.VISIBLE);
+            //computeSearchOptions();
+            //edit.beginSearchMode();
             recyclerViewSymbols.post(() -> {
                 int displayHeight = calculateFirstItemHeight(recyclerViewSymbols);
                 ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) root.getLayoutParams();
@@ -531,19 +781,14 @@ public class FileContentFragment extends Fragment {
     }
 
     private int calculateSpanCount() {
-        // 获取屏幕宽度
         DisplayMetrics displayMetrics = new DisplayMetrics();
         requireActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
         int screenWidth = displayMetrics.widthPixels;
-
-        // 测量符号项的宽度
         View itemView = getLayoutInflater().inflate(R.layout.symbol_item, null, false);
         int widthSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         int heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         itemView.measure(widthSpec, heightSpec);
         int itemWidth = itemView.getMeasuredWidth();
-
-        // 计算每行最大个数
         return screenWidth / itemWidth;
     }
 
@@ -585,7 +830,6 @@ public class FileContentFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        // 这里可以根据需要加载文件内容到 EditText
     }
 
     public class s_scheme extends EditorColorScheme {

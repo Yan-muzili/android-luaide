@@ -31,6 +31,7 @@ import static com.yan.luaeditor.format.LuaTokenTypes.ELSE;
 import static com.yan.luaeditor.format.LuaTokenTypes.ELSEIF;
 import static com.yan.luaeditor.format.LuaTokenTypes.END;
 import static com.yan.luaeditor.format.LuaTokenTypes.ENDREGION;
+import static com.yan.luaeditor.format.LuaTokenTypes.EOF;
 import static com.yan.luaeditor.format.LuaTokenTypes.EQ;
 import static com.yan.luaeditor.format.LuaTokenTypes.EXP;
 import static com.yan.luaeditor.format.LuaTokenTypes.FALSE;
@@ -1540,7 +1541,8 @@ public class LuaLexer {
           }
           case 168: break;
           default:
-            zzScanError(ZZ_NO_MATCH);
+            //zzScanError(ZZ_NO_MATCH);
+            return EOF;
         }
       }
     }

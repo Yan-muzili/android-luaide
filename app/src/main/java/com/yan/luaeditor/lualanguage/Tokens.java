@@ -66,5 +66,17 @@ public enum Tokens {
     TRY,
     CATCH,
     XOR,
-    QUESTION
+    QUESTION,
+    EQEQ,
+    LTEQ,
+    GTEQ,
+    DOTEQ,
+    LTLT,
+    LTGT,
+    CLT,
+    AEQ,
+    GTGT,
+    ARROW,
+
+    OP
 }

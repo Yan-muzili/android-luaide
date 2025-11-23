@@ -36,7 +36,7 @@ public class State {
 
     public List<String> identifiers = null;
     public Stack<Character> stack = new Stack<>();
-
+    public int longCommentEqualCount = 0;
     public void addIdentifier(CharSequence idt) {
         if (identifiers == null) {
             identifiers = new ArrayList<>();

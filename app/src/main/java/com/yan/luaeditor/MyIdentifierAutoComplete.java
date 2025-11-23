@@ -76,14 +76,13 @@ public class MyIdentifierAutoComplete {
     private String[] keywords;
     private boolean keywordsAreLowCase;
     private Map<String, Object> keywordMap;
-    HashMap<String, HashMap<String, CompletionName>> basemap;
+    HashMap<String, Object> basemap;
     HashMap<String, List<String>> classmap;
-    HashMap<String, String> mmap;
-    HashMap<String, HashMap<String, CompletionName>> importlist;
+    HashMap<String, String> mmap,importmap;
     public MyIdentifierAutoComplete() {
     }
 
-    public MyIdentifierAutoComplete(String[] keywords, HashMap<String, HashMap<String, CompletionName>> basemap) {
+    public MyIdentifierAutoComplete(String[] keywords, HashMap<String, Object> basemap) {
         this();
         setKeywords(keywords, true);
         this.basemap = basemap;
@@ -93,12 +92,10 @@ public class MyIdentifierAutoComplete {
         return (str instanceof String ? (String) str : str.toString());
     }
 
-    public void setBasemap(HashMap<String, HashMap<String, CompletionName>> map) {
+    public void setBasemap(HashMap<String, Object> map) {
         this.basemap = map;
     }
-    public void setImportlist(HashMap<String, HashMap<String, CompletionName>> im){
-        this.importlist=im;
-    }
+
 
     public void setClassmap(HashMap<String, List<String>> classmap) {
         this.classmap = classmap;
@@ -106,6 +103,10 @@ public class MyIdentifierAutoComplete {
 
     public void setMmap(HashMap<String, String> map) {
         this.mmap = map;
+    }
+
+    public void setImportmap(HashMap<String, String> importmap) {
+        this.importmap = importmap;
     }
 
     public void setKeywords(String[] keywords, boolean lowCase) {
@@ -218,22 +219,25 @@ public class MyIdentifierAutoComplete {
                 }
             }
         }
-        //System.out.println(importlist);
+
         boolean foundInImportList = false;
 
 
-        for (String imp : importlist.keySet()) {
-            String[] name = imp.split("\\.");
-            if (name[name.length - 1].startsWith(prefix)) {
-                result.add(
-                        new SimpleCompletionItem(name[name.length - 1], ":import", prefixLength, name[name.length - 1])
-                                .kind(CompletionItemKind.Class));
-                foundInImportList = true;
+        if (importmap!=null) {
+            for (String imp : importmap.keySet()) {
+                String[] name = imp.split("\\.");
+                if (name[name.length - 1].startsWith(prefix)) {
+                    result.add(
+                            new SimpleCompletionItem(name[name.length - 1], ":import", prefixLength, name[name.length - 1])
+                                    .kind(CompletionItemKind.Class));
+                    foundInImportList = true;
+                }
             }
         }
-        
-        if (!foundInImportList) {
+        //LuaUtil.save2("/sdcard/Luaide/yyy.log", classmap.toString());
+        if (!foundInImportList&&classmap!=null) {
             for (String str : classmap.keySet()) {
+                //System.out.println(str);
                 if (str.startsWith(prefix) && !str.matches(".*\\.\\d+$")) {
                     for (String cl : classmap.get(str)) {
                         result.add(
@@ -246,7 +250,7 @@ public class MyIdentifierAutoComplete {
         }
 
         //LuaUtil.save2("/sdcard/Luaide/yyy.log", basemap.toString());
-        mmap.put("activity", "LuaActivity");
+        //mmap.put("activity", "LuaActivity");
         //LuaUtil.save2("/sdcard/Luaide/yyy.log", basemap.toString());
         //mmap.put("Toast.makeText","");
         //long startTime = System.currentTimeMillis();
@@ -256,17 +260,69 @@ public class MyIdentifierAutoComplete {
             LuaParser parser = new LuaParser(tokens);
             //System.out.println(tokens);
             String filtered = parser.filterParentheses(prefix);
-            String prefixtype = ClassMethodScanner.getReturnType(classmap, basemap, filtered, mmap);
+            //System.out.println(filtered);
+            String prefixtype="nullclass";
+            try {
+                prefixtype = ClassMethodScanner.getReturnType(filtered, basemap, importmap, mmap);
+            } catch (Exception e) {
+                System.out.println("type:"+e.getMessage());
+            }
+            //System.out.println(prefixtype);
+            //LuaUtil.save2("/sdcard/Luaide/yyy.log",basemap.get("android.widget.Toast").toString());
+            if (!prefixtype.equals("nullclass") ) {
+                if (!prefixtype.equals("void") && filtered.endsWith(".")) {
+                    try {
+                        HashMap<String,Object> map=((HashMap<String,Object>)ClassMethodScanner.getMap(basemap,prefixtype.split("\\$")));
+                        for (String key : map.keySet()) {
+                            //System.out.println(basemap.get(prefixtype).get(key).getGeneric());
+                            if (map.get(key)instanceof CompletionName) {
+                                result.add(
+                                        new SimpleCompletionItem(key, ((CompletionName) map.get(key)).getDescription(), prefixLength, prefix + key)
+                                                .kind(((CompletionName) map.get(key)).getType()));
+                            } else if (map.get(key)instanceof HashMap<?,?>) {
+                                result.add(
+                                        new SimpleCompletionItem(key, ":class", prefixLength, prefix + key)
+                                                .kind(CompletionItemKind.Class));
+                            }
 
-            if (!prefixtype.equals("nullclass") && !prefixtype.equals("void") && filtered.endsWith(".")) {
-                try {
-                    for (String key : basemap.get(prefixtype).keySet()) {
-                        result.add(
-                                new SimpleCompletionItem(key, basemap.get(prefixtype).get(key).getDescription(), prefixLength, prefix + key)
-                                        .kind(basemap.get(prefixtype).get(key).getType()));
+                        }
+                    } catch (Exception e) {
+                        System.out.println(e.getMessage());
                     }
-                } catch (Exception e) {
-                    LuaUtil.save2("/sdcard/Luaide/yyy.log", e.getMessage());
+                }else {
+                    String[] allstr = filtered.split("\\.");
+                    String[] mystr = prefix.split("\\.");
+                    StringBuilder sc = new StringBuilder();
+                    StringBuilder complete = new StringBuilder();
+                    for (int i = 0; i < allstr.length - 1; i++) {
+                        sc.append(allstr[i]).append(".");
+                        complete.append(mystr[i]).append(".");
+                    }
+                    //System.out.println(sc);
+                    try {
+                        String classname = ClassMethodScanner.getReturnType(sc.toString(), basemap, importmap, mmap);
+                        if (!classname.equals("nullclass") && !classname.equals("void")) {
+                            HashMap<String,Object> map=((HashMap<String,Object>)ClassMethodScanner.getMap(basemap,classname.split("\\$")));
+                            for (String key : map.keySet()) {
+                                if ((sc + key).startsWith(filtered)) {
+                                    //System.out.println(basemap.get(classname).get(key).getGeneric());
+                                    if (map.get(key)instanceof CompletionName) {
+                                        result.add(
+                                                new SimpleCompletionItem(key, ((CompletionName) map.get(key)).getDescription(), prefixLength, complete + key)
+                                                        .kind(((CompletionName) map.get(key)).getType()));
+                                    }else if (map.get(key)instanceof HashMap<?,?>) {
+                                        result.add(
+                                                new SimpleCompletionItem(key, ":class", prefixLength, complete + key)
+                                                        .kind(CompletionItemKind.Class));
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        //LuaUtil.save2("/sdcard/Luaide/yyy.log", e.getMessage());
+                        System.out.println(e.getMessage());
+                    }
+
                 }
             } else if (prefixtype.equals("nullclass")) {
                 if (filtered == null || prefix == null || filtered.isEmpty() || prefix.isEmpty()) {
@@ -282,22 +338,32 @@ public class MyIdentifierAutoComplete {
                 }
                 //System.out.println(sc);
                 try {
-                    String classname = ClassMethodScanner.getReturnType(classmap, basemap, sc.toString(), mmap);
+                    String classname = ClassMethodScanner.getReturnType(sc.toString(), basemap, importmap, mmap);
+                    //System.out.println("classname"+classname);
                     if (!classname.equals("nullclass") && !classname.equals("void")) {
-                        for (String key : basemap.get(classname).keySet()) {
+                        HashMap<String,Object> map=((HashMap<String,Object>)ClassMethodScanner.getMap(basemap,classname.split("\\$")));
+                        for (String key : map.keySet()) {
                             if ((sc + key).startsWith(filtered)) {
-                                result.add(
-                                        new SimpleCompletionItem(key, basemap.get(classname).get(key).getDescription(), prefixLength, complete + key)
-                                                .kind(basemap.get(classname).get(key).getType()));
+                                if (map.get(key) instanceof CompletionName) {
+                                    result.add(
+                                            new SimpleCompletionItem(key, ((CompletionName) map.get(key)).getDescription(), prefixLength, complete + key)
+                                                    .kind(((CompletionName) map.get(key)).getType()));
+                                }else if (map.get(key)instanceof HashMap<?,?>) {
+                                    result.add(
+                                            new SimpleCompletionItem(key, ":class", prefixLength, complete + key)
+                                                    .kind(CompletionItemKind.Class));
+                                }
                             }
                         }
                     }
                 } catch (Exception e) {
-                    LuaUtil.save2("/sdcard/Luaide/yyy.log", e.getMessage());
+                    System.out.println(e.getMessage());
                 }
             }
+
+
         } catch (Exception e) {
-            LuaUtil.save2("/sdcard/Luaide/yyy.log", e.getMessage());
+            System.out.println(e.getMessage());
         }
         //long endTime = System.currentTimeMillis();
         //long duration = endTime - startTime;

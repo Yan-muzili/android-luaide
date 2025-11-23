@@ -60,7 +60,6 @@ public class LuaLexer {
             case GE:
             case COLON:
             case SEMI:
-            case COMMA:
             case DOT:
             case DOUBLE_COLON:
             case DOUBLE_DIV:
@@ -103,7 +102,11 @@ public class LuaLexer {
             case NIL:
                 return Token.TokenType.KEYWORD;
             case WHITE_SPACE:
-                return Token.TokenType.WHITESPACE; // 新增忽略空格的类型
+                return Token.TokenType.WHITESPACE;// 新增忽略空格的类型
+            case NEW_LINE:
+                return Token.TokenType.NEWLINE;
+            case COMMA:
+                return Token.TokenType.COMMENT;
             default:
                 return Token.TokenType.EOF;
         }

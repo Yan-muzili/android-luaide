@@ -90,7 +90,6 @@ public class FileTreeAdapter extends RecyclerView.Adapter<FileTreeAdapter.ViewHo
             if (fileNode.isFolder()) {
                 fileNode.setExpanded(!fileNode.isExpanded());
                 if (!fileNode.isExpanded()) {
-                    // 当父文件夹收起时，将所有子文件夹也收起
                     collapseAllChildren(fileNode);
                 }
                 mainHandler.post(() -> {

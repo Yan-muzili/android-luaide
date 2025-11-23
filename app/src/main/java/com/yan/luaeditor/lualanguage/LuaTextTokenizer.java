@@ -174,6 +174,11 @@ public class LuaTextTokenizer {
             if (isPrimeDigit(ch)) {
                 return scanNumber();
             }
+            char nextch = 0;
+            if (offset+1<bufferLen) {
+                nextch = source.charAt(offset + 1);
+            }
+
             /* Scan usual symbols first */
             if (ch == ';') {
                 return Tokens.SEMICOLON;
@@ -188,11 +193,23 @@ public class LuaTextTokenizer {
             } else if (ch == '>') {
                 return scanGT();
             }
+
             /* Scan secondly symbols */
             switch (ch) {
                 case '=':
+                    if (nextch == '=') {
+                        length = 2;
+                        return scanOperatorTwo(Tokens.EQEQ);
+                    } else if (nextch=='>') {
+                        length=2;
+                        return Tokens.OP;
+                    }
                     return scanOperatorTwo(Tokens.EQ);
                 case '.':
+                    if (nextch == '=') {
+                        length = 2;
+                        return scanOperatorTwo(Tokens.DOTEQ);
+                    }
                     return Tokens.DOT;
                 case '@':
                     return Tokens.AT;
@@ -205,9 +222,17 @@ public class LuaTextTokenizer {
                 case '*':
                     return scanOperatorTwo(Tokens.MUL);
                 case '-':
+                    if (nextch == '>') {
+                        length = 2;
+                        return Tokens.ARROW;
+                    }
                     return scanDIV();
                 case '+':
-                    return scanOperatorTwo(Tokens.AND);
+                    if (nextch == '=') {
+                        length = 2;
+                        return Tokens.AEQ;
+                    }
+                    return scanOperatorTwo(Tokens.ADD);
                 case '[':
                     return Tokens.LBRACK;
                 case ']':
@@ -215,14 +240,26 @@ public class LuaTextTokenizer {
                 case ',':
                     return Tokens.COMMA;
                 case '!':
+                    if (nextch == '=') {
+                        length = 2;
+                        return Tokens.NEQ;
+                    }
                     return Tokens.NOT;
                 case '~':
+                    if (nextch == '=') {
+                        length = 2;
+                        return Tokens.NEQ;
+                    }
                     return Tokens.XOR;
                 case '?':
                     return Tokens.QUESTION;
                 case '&':
                     return scanOperatorTwo(Tokens.AND);
                 case '|':
+                    if (nextch == '>') {
+                        length = 2;
+                        return Tokens.OP;
+                    }
                     return scanOperatorTwo(Tokens.OR);
                 case '^':
                     return scanOperatorTwo(Tokens.POW);
@@ -396,42 +433,62 @@ public class LuaTextTokenizer {
     }
 
     /* The following methods have been simplified for syntax high light */
+    private int eqCount = 0;
+    private int closeEqCount=0;
 
     protected Tokens scanDIV() {
         if (offset + 1 >= bufferLen) {
             return Tokens.DIV;
         }
+
         char ch = charAt(offset);
         char nextChar = charAt(offset + 1);
 
-        if (ch == '-' && nextChar == '-') { // Possible start of a comment
-            // Check if this is the start of a multi-line comment
-            if (offset + 2 < bufferLen && charAt(offset + 2) == '[' && charAt(offset + 3) == '[') {
-                // Multi-line comment start
-                length += 2; // Skip the '--[[' part
-                boolean finished = false;
-                while (offset + length < bufferLen) {
-                    char currChar = charAt(offset + length);
-                    //System.out.println(
-                            //"Current char at offset " + offset + " length " + length + ": " + currChar);
-                    if (currChar == ']' && charAt(offset + length + 1) == ']') {
-                        length += 2; // Include the ']]' in the length
-                        finished = true;
-                        System.out.println("yes");
-                        break;
+        if (ch == '-' && nextChar == '-') {
+            // 检查是否是长注释 --[=*[
+            eqCount = 0;
+            int i = offset + 2;
+
+            if (i < bufferLen && charAt(i) == '[') {
+                i++;
+                while (i < bufferLen && charAt(i) == '=') {
+                    eqCount++;
+                    i++;
+                }
+                if (i < bufferLen && charAt(i) == '[') {
+                    // 是长注释起点
+                    length = i + 1 - offset; // 包含 --[=[ 部分
+                    boolean finished = false;
+                    while (offset + length < bufferLen) {
+                        // 查找 ]=...=]
+                        if (charAt(offset + length) == ']') {
+                            int j = offset + length + 1;
+                            closeEqCount = 0;
+                            while (j < bufferLen && charAt(j) == '=') {
+                                closeEqCount++;
+                                j++;
+                            }
+                            if (j < bufferLen && charAt(j) == ']' && closeEqCount == eqCount) {
+                                length = j + 1 - offset;
+                                finished = true;
+                                break;
+                            }
+                        }
+                        length++;
                     }
-                    length++;
+
+                    return finished ? Tokens.LONG_COMMENT_COMPLETE : Tokens.LONG_COMMENT_INCOMPLETE;
                 }
-                return finished ? Tokens.LONG_COMMENT_COMPLETE : Tokens.LONG_COMMENT_INCOMPLETE;
-            } else {
-                // Single line comment
-                while (offset + length < bufferLen && charAt(offset + length) != '\n') {
-                    length++;
-                }
-                return Tokens.LINE_COMMENT;
             }
+
+            // 单行注释
+            while (offset + length < bufferLen && charAt(offset + length) != '\n') {
+                length++;
+            }
+            return Tokens.LINE_COMMENT;
         }
-        return Tokens.DIV; // Default return if none of the above conditions are met
+
+        return Tokens.DIV;
     }
 
     public boolean isAssignment() {
@@ -462,11 +519,43 @@ public class LuaTextTokenizer {
 
     @SuppressWarnings("SameReturnValue")
     protected Tokens scanLT() {
+        if (offset+1<bufferLen) {
+            char ch = source.charAt(offset + 1);
+            switch (ch) {
+                case '=':
+                    if (offset + 2 < bufferLen && source.charAt(offset + 2) == '>') {
+                        length = 3;
+                        return Tokens.OP;
+                    }
+                    length = 2;
+                    return Tokens.LEQ;
+                case '<':
+                    length = 2;
+                    return Tokens.LTLT;
+                case '>':
+                    length = 2;
+                    return Tokens.LTGT;
+                case ':':
+                    length = 2;
+                    return Tokens.CLT;
+            }
+        }
         return Tokens.LT;
     }
 
     @SuppressWarnings("SameReturnValue")
     protected Tokens scanGT() {
+        if (offset+1<bufferLen) {
+            char ch = source.charAt(offset + 1);
+            switch (ch) {
+                case '=':
+                    length = 2;
+                    return Tokens.GEQ;
+                case '>':
+                    length = 2;
+                    return Tokens.GTGT;
+            }
+        }
         return Tokens.GT;
     }
 

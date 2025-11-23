@@ -1,13 +1,16 @@
 package com.yan.luaeditor.tools
 
+
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.yan.luaeditor.CompletionName
 import com.yan.luaide.R
+import dalvik.system.DexFile
+import io.github.rosemoe.sora.lang.completion.CompletionItemKind
 import org.json.JSONObject
 import java.io.File
 import java.io.FileNotFoundException
-import dalvik.system.DexFile
-import io.github.rosemoe.sora.lang.completion.CompletionItemKind
 
 object PackageUtil {
 
@@ -70,12 +73,12 @@ object PackageUtil {
 
     private fun initializePackages(context: Context, jsonContent: String) {
         packages = JSONObject(jsonContent)
+
         // 处理 DexFile 条目
         DexFile(context.packageCodePath).entries().asSequence()
-            .forEach { fullClassName ->
+            .map { it.replace("$", ".").split(".") }.forEach { parts ->
                 var currentJson = packages
-                val parts = fullClassName.split(".")
-                parts.forEach { part ->
+                parts.filter { it.length > 2 }.forEach { part ->
                     currentJson = currentJson?.let { json ->
                         when {
                             json.has(part) -> json.getJSONObject(part)
@@ -89,23 +92,39 @@ object PackageUtil {
         buildImports(packages!!, "")
     }
 
-    private fun buildImports(json: JSONObject, pkg: String) {
-        json.keys().asSequence().forEach { key ->
-            try {
-                val subJson = json.getJSONObject(key)
-                if (key[0].isUpperCase()) {
-                    classMap.getOrPut(key) { mutableListOf() }.add(pkg + key)
-                }
+    private fun buildImports(json: JSONObject, prefix: String = "") {
+        json.keys().forEach { key ->
+            val subJson = json.optJSONObject(key) ?: return@forEach
+            val current = if (prefix.isEmpty()) key else "$prefix.$key"
+
+            val clazz = runCatching { Class.forName(current) }.getOrNull()
+
+            if (clazz != null) {
+                // 确认为类，记录并进入内部类模式
+                classMap.getOrPut(key) { mutableListOf() } += current
+                buildNested(subJson, current)
+            } else {
+                // 仍是包，继续按包递归
+                buildImports(subJson, current)
                 if (subJson.length() == 0) {
-                    classNames.add(pkg + key)
-                } else {
-                    buildImports(subJson, "$pkg$key.")
+                    classNames += current   // 原逻辑：空对象代表叶子包
                 }
-            } catch (e: Exception) {
-                // 忽略解析错误
             }
         }
     }
+
+    private fun buildNested(json: JSONObject, parent: String) {
+        json.keys().forEach { key ->
+            val subJson = json.optJSONObject(key) ?: return@forEach
+            val nested = "$parent$$key"
+
+            if (runCatching { Class.forName(nested) }.isSuccess) {
+                classMap.getOrPut(key) { mutableListOf() } += nested
+                buildNested(subJson, nested)
+            }
+        }
+    }
+
 
     @JvmStatic
     fun fix(name: String): List<String>? = classMap[name]
@@ -132,15 +151,16 @@ object PackageUtil {
         }
 
         val packages = currentJson?.keys()?.asSequence()?.filter { it.startsWith(searchTerm) }
-            ?.map { CompletionName(it, CompletionItemKind.Text, " :package | :class") }?.toList()
+            ?.map { CompletionName(it, CompletionItemKind.Text, " :package | :class","") }?.toList()
             ?: emptyList()
 
         val classes = classNames.filter { it.startsWith(searchTerm) }
-            .map { CompletionName(it, CompletionItemKind.Text, " :class") }.toList()
+            .map { CompletionName(it, CompletionItemKind.Text, " :class","") }.toList()
 
         return packages + classes
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     @JvmStatic
     fun filterPackage(name: String, current: String): List<CompletionName> {
         if (packages == null) return emptyList()
@@ -165,12 +185,13 @@ object PackageUtil {
             }.toList()
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun getJavaMethods(clazz: Class<*>): List<CompletionName> {
         val methods = clazz.methods
         val names = mutableListOf<CompletionName>()
         for (method in methods) {
             if (method.name.contains("lambda")) continue
-            names.add(CompletionName(method.name, CompletionItemKind.Method, " :method"))
+            names.add(CompletionName(method.name, CompletionItemKind.Method, " :method",ClassMethodScanner.getParameterTypesAsString(method)))
 
             if (method.parameters.isEmpty() && method.name.startsWith("get")) {
                 val name = method.name.substring(3)
@@ -178,7 +199,8 @@ object PackageUtil {
                     CompletionName(
                         name.substring(0, 1).lowercase() + name.substring(1),
                         CompletionItemKind.Property,
-                        " :property"
+                        " :property",
+                        ClassMethodScanner.getParameterTypesAsString(method)
                     )
                 )
             }
@@ -196,7 +218,7 @@ object PackageUtil {
                 // sort the first char
                 name = name.substring(0, 1).lowercase() + name.substring(1)
 
-                names.add(CompletionName(name, CompletionItemKind.Field, " :field"))
+                names.add(CompletionName(name, CompletionItemKind.Field, " :field",""))
             }
         }
 
@@ -207,7 +229,7 @@ object PackageUtil {
         val fields = clazz.fields
         val names = mutableListOf<CompletionName>()
         for (field in fields) {
-            names.add(CompletionName(field.name, CompletionItemKind.Field, " :field"))
+            names.add(CompletionName(field.name, CompletionItemKind.Field, " :field",""))
         }
 
         return names

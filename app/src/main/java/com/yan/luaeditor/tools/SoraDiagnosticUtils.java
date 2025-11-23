@@ -16,7 +16,7 @@ public class SoraDiagnosticUtils {
      * @param quickfixes 解决方案列表
      */
     public static void addDiagnostic(DiagnosticsContainer diagnostics, int line, int column,String title, String message, List<Quickfix> quickfixes) {
-        DiagnosticRegion region = new DiagnosticRegion(line, column, DiagnosticRegion.SEVERITY_ERROR, DiagnosticRegion.SEVERITY_ERROR, new DiagnosticDetail(title, message, null,null));
+        DiagnosticRegion region = new DiagnosticRegion(line, column, DiagnosticRegion.SEVERITY_ERROR, DiagnosticRegion.SEVERITY_ERROR, new DiagnosticDetail(title!=null?title:"", message!=null?message:"", null,null));
         diagnostics.addDiagnostic(region);
     }
 }

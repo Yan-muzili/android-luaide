@@ -46,6 +46,7 @@ public class AutoIndent {
     }
 
     public static CharSequence format(CharSequence text, int width) {
+
         CharSequence firstPass = firstPassFormat(text);
         return secondPassFormat(firstPass, width);
     }
@@ -103,10 +104,68 @@ public class AutoIndent {
         return builder;
     }
 
+    /*private static CharSequence clear(CharSequence text){
+        StringBuilder sb=new StringBuilder();
+        LuaLexer lexer = new LuaLexer(text);
+        LuaTokenTypes afterType=null;
+        try {
+            while (true) {
+                LuaTokenTypes type = lexer.advance();
+                if (type == null)
+                    break;
+                if (type == LuaTokenTypes.WHITE_SPACE||type==LuaTokenTypes.NEW_LINE) {
+                    continue;
+                }
+                switch (type){
+                    case FUNCTION:
+                        afterType=LuaTokenTypes.FUNCTION;
+                        sb.append("function");
+                        break;
+                    case FOR:
+                        afterType=LuaTokenTypes.FOR;
+                        sb.append("for");
+                        break;
+                    case IF:
+                        afterType=LuaTokenTypes.IF;
+                        sb.append("if");
+                        break;
+                    case WHILE:
+                        afterType=LuaTokenTypes.WHILE;
+                        sb.append("while");
+                        break;
+                    case REPEAT:
+                        afterType=LuaTokenTypes.REPEAT;
+                        sb.append("repeat");
+                        break;
+                    case SWITCH:
+                        afterType=LuaTokenTypes.SWITCH;
+                        sb.append("switch");
+                        break;
+                    case THEN:
+                        afterType=LuaTokenTypes.THEN;
+                        sb.append("then\n");
+                        break;
+                    case DO:
+                        sb.append("do\n");
+                        break;
+                    default:
+                        sb.append(lexer.yytext());
+                        break;
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return sb;
+    }
+
+     */
+
     private static CharSequence secondPassFormat(CharSequence text, int width) {
         StringBuilder builder = new StringBuilder();
         boolean isNewLine = true;
         LuaLexer lexer = new LuaLexer(text);
+        LuaTokenTypes after=null;
         try {
             int idt = 0;
 
@@ -116,10 +175,13 @@ public class AutoIndent {
                     break;
 
                 if (type == LuaTokenTypes.NEW_LINE) {
+
                     if (builder.length() > 0 && builder.charAt(builder.length() - 1) == ' ')
                         builder.deleteCharAt(builder.length() - 1);
                     isNewLine = true;
-                    builder.append('\n');
+                    if (after!=null&&(after!=LuaTokenTypes.LPAREN&&after!=LuaTokenTypes.LBRACK)) {
+                        builder.append("\n");
+                    }
                     idt = Math.max(0, idt);
                 } else if (isNewLine) {
                     switch (type) {
@@ -182,7 +244,9 @@ public class AutoIndent {
                     }
                     idt += indent(type);
                 }
+                after=type;
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }

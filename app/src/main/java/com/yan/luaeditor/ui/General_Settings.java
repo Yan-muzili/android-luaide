@@ -3,6 +3,7 @@ package com.yan.luaeditor.ui;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.content.res.TypedArray;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
@@ -24,6 +25,7 @@ import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.color.DynamicColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.yan.luaeditor.adapter.SetListAdapter;
+import com.yan.luaeditor.tools.ThemeSwitchHelper;
 import com.yan.luaide.R;
 import com.yan.luaide.databinding.GeneralSettingsBinding;
 
@@ -38,61 +40,12 @@ public class General_Settings extends AppCompatActivity {
     private List<SetListAdapter.ItemModel> itemList;
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+
+        updateTheme();
+
+
+        ThemeSwitchHelper.installTransition(this);
         super.onCreate(savedInstanceState);
-        SharedPreferences Scheme = getSharedPreferences("EditorSet", Context.MODE_PRIVATE);
-        if ((Scheme.getInt("Background", 0) == 0)) {
-            if ((Scheme.getInt("Scheme", -1)) != -1) {
-                switch (Scheme.getInt("Scheme", -1)) {
-                    case 0:
-                        setTheme(R.style.Theme_AndroidIDE_BlueWave);
-                        break;
-                    case 1:
-                        setTheme(R.style.Theme_AndroidIDE_SunnyGlow);
-                        break;
-                    case 2:
-                        setTheme(R.style.Theme_Material3_Blue_NoActionBar);
-                        break;
-                    case 3:
-                        setTheme(R.style.Theme_Material3_Green_NoActionBar);
-                        break;
-                    case 4:
-                        setTheme(R.style.Theme_Material3_Orange_NoActionBar);
-                        break;
-                    case 5:
-                        setTheme(R.style.Theme_Material3_Brown_NoActionBar);
-                        break;
-                    case 6:
-                        DynamicColors.applyToActivitiesIfAvailable(this.getApplication());
-                        break;
-                }
-            }
-        } else {
-            if ((Scheme.getInt("Scheme", -1)) != -1) {
-                switch (Scheme.getInt("Scheme", -1)) {
-                    case 0:
-                        setTheme(R.style.Theme_AndroidIDE_BlueWave_Dark);
-                        break;
-                    case 1:
-                        setTheme(R.style.Theme_AndroidIDE_SunnyGlow_Dark);
-                        break;
-                    case 2:
-                        setTheme(R.style.Theme_Material3_Blue_Dark_NoActionBar);
-                        break;
-                    case 3:
-                        setTheme(R.style.Theme_Material3_Green_Dark_NoActionBar);
-                        break;
-                    case 4:
-                        setTheme(R.style.Theme_Material3_Orange_Dark_NoActionBar);
-                        break;
-                    case 5:
-                        setTheme(R.style.Theme_Material3_Brown_Dark_NoActionBar);
-                        break;
-                    case 6:
-                        DynamicColors.applyToActivitiesIfAvailable(this.getApplication());
-                        break;
-                }
-            }
-        }
         binding=GeneralSettingsBinding.inflate(getLayoutInflater());
         materialToolbar=binding.activityGeneralSetToolbar;
         recyclerView=binding.generalSetList;
@@ -212,6 +165,35 @@ public class General_Settings extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private void updateTheme(){
+        SharedPreferences scheme = getSharedPreferences("EditorSet", Context.MODE_PRIVATE);
+        int bg = scheme.getInt("Background", 0);
+        int sc = scheme.getInt("Scheme", -1);
+        int themeResId;
+        if (bg == 0) {
+            // Light theme
+            if (sc == 6) {
+                DynamicColors.applyToActivitiesIfAvailable(getApplication());
+            } else {
+                TypedArray lightThemes = getResources().obtainTypedArray(R.array.light_themes);
+                themeResId = lightThemes.getResourceId(sc, R.style.app_theme);
+                lightThemes.recycle();
+                setTheme(themeResId);
+            }
+        } else {
+            // Dark theme
+            if (sc == 6) {
+                DynamicColors.applyToActivitiesIfAvailable(getApplication());
+            } else {
+                TypedArray darkThemes = getResources().obtainTypedArray(R.array.dark_themes);
+                themeResId = darkThemes.getResourceId(sc, R.style.app_theme);
+
+                darkThemes.recycle();
+                setTheme(themeResId);
+            }
+        }
     }
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {

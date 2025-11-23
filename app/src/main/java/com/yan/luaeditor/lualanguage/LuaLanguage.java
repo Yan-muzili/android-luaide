@@ -25,10 +25,12 @@ package com.yan.luaeditor.lualanguage;
 
 import static java.lang.Character.isWhitespace;
 
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.yan.luaeditor.CompletionHelper;
 import com.yan.luaeditor.CompletionName;
@@ -36,9 +38,18 @@ import com.yan.luaeditor.MyIdentifierAutoComplete;
 import com.yan.luaeditor.MyPrefixChecker;
 import com.yan.luaeditor.tools.parser.LuaLexer;
 import com.yan.luaeditor.tools.parser.LuaParser;
+import com.yan.luaeditor.tools.parser.LuaTableParser;
+import com.yan.luaeditor.tools.parser.ParserLuaLayout;
 import com.yan.luaeditor.tools.parser.Token;
 import com.yan.luaide.LuaUtil;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,7 +59,9 @@ import io.github.rosemoe.sora.lang.EmptyLanguage;
 import io.github.rosemoe.sora.lang.Language;
 import io.github.rosemoe.sora.lang.QuickQuoteHandler;
 import io.github.rosemoe.sora.lang.analysis.AnalyzeManager;
+import io.github.rosemoe.sora.lang.completion.CompletionItemKind;
 import io.github.rosemoe.sora.lang.completion.CompletionPublisher;
+import io.github.rosemoe.sora.lang.completion.SimpleCompletionItem;
 import io.github.rosemoe.sora.lang.completion.SimpleSnippetCompletionItem;
 import io.github.rosemoe.sora.lang.completion.SnippetDescription;
 import io.github.rosemoe.sora.lang.completion.snippet.CodeSnippet;
@@ -81,25 +94,29 @@ public class LuaLanguage implements Language {
     private MyIdentifierAutoComplete autoComplete;
     private final LuaIncrementalAnalyzeManager manager;
     private final LuaQuoteHandler javaQuoteHandler = new LuaQuoteHandler();
-
-    HashMap<String, HashMap<String, CompletionName>> baseMap;
+    List<String> allClass;
+    HashMap<String, Object> baseMap;
     HashMap<String, List<String>> classMap;
-    public LuaLanguage(HashMap<String, HashMap<String, CompletionName>> map, HashMap<String, List<String>> classmap) {
+    String path;
+    public LuaLanguage(HashMap<String, Object> map, HashMap<String, List<String>> classmap,List<String> allClass) {
         autoComplete = new MyIdentifierAutoComplete(LuaTextTokenizer.sKeywords, map);
         manager = new LuaIncrementalAnalyzeManager();
         this.baseMap = map;
         this.classMap=classmap;
+        this.allClass=allClass;
         // edit.setDiagnostics(manager.diagnosticsContainer);
     }
 
-    public LuaLanguage(String[] keywords, HashMap<String, HashMap<String, CompletionName>> map,HashMap<String, List<String>> classmap) {
+    public LuaLanguage(String[] keywords, HashMap<String, Object> map,HashMap<String, List<String>> classmap) {
         autoComplete = new MyIdentifierAutoComplete(keywords, map);
         manager = new LuaIncrementalAnalyzeManager();
         this.baseMap = map;
         this.classMap=classmap;
         // edit.setDiagnostics(manager.diagnosticsContainer);
     }
-
+    public void setLayoutPath(String path){
+        this.path=path;
+    }
 
     @NonNull
     @Override
@@ -125,6 +142,7 @@ public class LuaLanguage implements Language {
 
     HashMap<String, String> map = new HashMap<>();
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void requireAutoComplete(
             @NonNull ContentReference content,
@@ -147,34 +165,73 @@ public class LuaLanguage implements Language {
                         LuaLexer lexer;
                         List<Token> tokens=null;
                         try {
-                            lexer = new LuaLexer(content.toString());
+                            lexer = new LuaLexer(content.toString().substring(0,position.index));
                             tokens = lexer.tokenize();
                         } catch (RuntimeException e) {
                             System.out.println(e.getMessage());
                         } catch (Exception e) {
                             System.out.println(e.getMessage());
                         }
-                        //LuaUtil.save2("/sdcard/Luaide/yyy.log",tokens.toString());
-                        //System.out.println(tokens.toString());
-                        try {
-                            LuaParser parser = new LuaParser(tokens);
-                            HashMap<String,HashMap<String,CompletionName>> importmap=new HashMap<>();
-                            //long startTime = System.currentTimeMillis();
-                            Set<String> baseKeys = new HashSet<>(baseMap.keySet());
-                            for (String str : parser.parseImports()) {
-                                String ss = str.replace(".*", "");
-                                for (String key : baseKeys) {
-                                    if (key.startsWith(ss)) {
-                                        importmap.put(key, baseMap.get(key));
+                        HashMap<String, Object> objectHashMap = new HashMap<>();
+                        try{
+                            ParserLuaLayout p=new ParserLuaLayout();
+                            List<String> aly=p.parseLoadLayout(tokens);
+                            //System.out.println("aly:"+aly);
+                            //System.out.println(path);
+                            File[] li=new File(path).listFiles();
+                            //System.out.println(li);
+                            for (String str:aly){
+                                for (File f:li){
+                                    //System.out.println(str+":"+f.getName().replaceAll("\\.aly",""));
+                                    if (str.endsWith(f.getName().replaceAll("\\.aly",""))){
+                                        String a = new String(readFileFast(f), StandardCharsets.UTF_8);
+                                        //System.out.println(a);
+                                        objectHashMap= LuaTableParser.luaTable2HashMap(a);
                                     }
                                 }
                             }
+                        } catch (Exception e) {
+                            System.out.println(e.getMessage());
+                        }
+                        //LuaUtil.save2("/sdcard/Luaide/yyy.log",tokens.toString());
+                        //System.out.println(objectHashMap);
+                        try {
+                            LuaParser parser = new LuaParser(tokens);
+                            HashMap<String,String> importmap=new HashMap<>();
+                            //long startTime = System.currentTimeMillis();
+                            try {
+                                for (String str : parser.parseImports()) {
+                                    String ss = str.replace(".*", "");
+                                    for (String key : allClass) {
+                                        if (key.startsWith(ss)) {
+                                            importmap.put(key, key);
+                                        }
+                                    }
+                                }
+                            } catch (Exception e) {
+                                System.out.println("ip"+e.getMessage());
+                            }
+                            //System.out.println(importmap);
+                            HashMap<String, String> aly=new ParserLuaLayout().parser(objectHashMap);
+                            HashMap<String,String> importstr=new HashMap<>();
+                            for (String str: importmap.keySet()){
+                                String[] name = str.split("\\.");
+                                if (importstr.get(name[name.length - 1])==null) {
+                                    importstr.put(name[name.length - 1], str);
+                                }
+                            }
+                            //System.out.println(aly);
+                            //ClassMethodScanner.getClassNames("/sdcard/Luaide/classes.dex");
                             //long endTime = System.currentTimeMillis();
                             //long duration = endTime - startTime;
                             //System.out.println("代码运行时长: " + duration + " 毫秒");
-                            autoComplete.setMmap((HashMap<String, String>) parser.parseVariables());
+                            //System.out.println(parser.parseVariables());
+                            HashMap<String,String> mmap=new HashMap<>();
+
+                            mmap.putAll(aly);
+                            autoComplete.setMmap(mmap);
                             autoComplete.setClassmap(classMap);
-                            autoComplete.setImportlist(importmap);
+                            autoComplete.setImportmap(importstr);
                             //LuaUtil.save2("/sdcard/Luaide/luaide.log", importmap.toString());
                         } catch (Exception e) {
                             LuaUtil.save2("/sdcard/Luaide/luaide.log", e.getMessage());
@@ -299,6 +356,27 @@ public class LuaLanguage implements Language {
                             .append(text = TextUtils.createIndent(count + advanceAfter, tabSize, useTab()));
             int shiftLeft = text.length() + 1;
             return new NewlineHandleResult(sb, shiftLeft);
+        }
+    }
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public static byte[] readFileFast(File file) throws IOException {
+        if (!file.exists()) {
+            throw new IOException("文件不存在: " + file.getAbsolutePath());
+        }
+        if (!file.canRead()) {
+            throw new IOException("文件不可读: " + file.getAbsolutePath());
+        }
+
+        long fileSize = file.length();
+        if (fileSize > Integer.MAX_VALUE) {
+            throw new IOException("文件太大，超过2GB: " + fileSize + " 字节");
+        }
+
+        try (FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
+            MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
+            byte[] data = new byte[(int) fileSize];
+            buffer.get(data);
+            return data;
         }
     }
 }

@@ -86,6 +86,6 @@ public enum LuaTokenTypes {
     AT,
     DEFER,
     WHEN,
-    LAMBDA
-
+    LAMBDA,
+    EOF
 }

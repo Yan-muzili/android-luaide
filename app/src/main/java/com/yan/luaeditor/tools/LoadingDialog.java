@@ -21,7 +21,6 @@ public class LoadingDialog extends Dialog {
 
     public LoadingDialog(Context context) {
         super(context);
-        // 移除 requestWindowFeature 的调用，它应该在 onCreate 中调用
     }
 
     @Override
