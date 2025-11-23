@@ -536,7 +536,7 @@ public class LuaUtil {
             out = new ZipOutputStream(new BufferedOutputStream(dest));
             out.setLevel(9);
             for (String s : fs) {
-                compress(new File(sourceFilePath,s), out, "");
+                compress(new File(sourceFilePath, s), out, "");
             }
             //checksum.getChecksum().getValue();
         } catch (Exception e) {
@@ -607,7 +607,6 @@ public class LuaUtil {
     }
 
 
-
     public static final HashMap<String, String> mFileTypes = new HashMap<String, String>();
 
     static {
@@ -675,10 +674,10 @@ public class LuaUtil {
         String value = null;
         try {
             byte[] b = new byte[4];
-        /*int read() 从此输入流中读取一个数据字节。
-        *int read(byte[] b) 从此输入流中将最多 b.length 个字节的数据读入一个 byte 数组中。
-        * int read(byte[] b, int off, int len) 从此输入流中将最多 len 个字节的数据读入一个 byte 数组中。
-        */
+            /*int read() 从此输入流中读取一个数据字节。
+             *int read(byte[] b) 从此输入流中将最多 b.length 个字节的数据读入一个 byte 数组中。
+             * int read(byte[] b, int off, int len) 从此输入流中将最多 len 个字节的数据读入一个 byte 数组中。
+             */
             inputStream.read(b, 0, b.length);
             value = bytesToHexString(b);
         } catch (Exception e) {
@@ -866,143 +865,170 @@ public class LuaUtil {
         }
     }
 
-        public static String bin(
-                Context context,
-                String mRootDir,
-                String mDir,
-                String aname,
-                String pkg,
-                String ver,
-                String code,
-                String amph,
-                String[] ps) {
-            String[] repomission = {
-                    "com.yan.luaide.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
-            };
-            File bf = new File(mRootDir, "bin");
-            bf.mkdirs();
-            File op = new File(bf, aname);
-            byte[] buffer;
-            Log.i("luaj", "bin: " + op);
-            try {
-                ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(op));
+    /**
+     * 将十进制long转换为十六进制字符串
+     *
+     * @param value       要转换的十进制数值
+     * @param uppercase   是否使用大写字母
+     * @param withPrefix  是否添加"0x"前缀
+     * @param fixedLength 是否固定输出长度为16个字符（包括前导零）
+     * @return 转换后的十六进制字符串
+     */
+    public static String longToHex(long value, boolean uppercase, boolean withPrefix, boolean fixedLength) {
+        String hex = Long.toHexString(value);
+        if (fixedLength && hex.length() < 16) {
+            hex = "0".repeat(16 - hex.length()) + hex;
+        }
+        if (uppercase) {
+            hex = hex.toUpperCase();
+        }
+        if (withPrefix) {
+            hex = "0x" + hex;
+        }
+        return hex;
+    }
 
-                File[] fs = new File(mDir).listFiles();
-                for (File f : fs) {
-                    addZip(zip, f, "assets");
-                }
+    public static String longToHex(long value) {
+        return longToHex(value, false, false, false);
+    }
 
-                ZipFile zf = new ZipFile(context.getPackageCodePath());
-                Enumeration<? extends ZipEntry> es = zf.entries();
-                while (es.hasMoreElements()) {
-                    ZipEntry z = es.nextElement();
-                    if (z.getName().startsWith("assets")) continue;
+    public static String bin(
+            Context context,
+            String mRootDir,
+            String mDir,
+            String aname,
+            String pkg,
+            String ver,
+            String code,
+            String amph,
+            String[] ps) {
+        String[] repomission = {
+                "com.yan.luaide.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        };
+        File bf = new File(mRootDir, "bin");
+        bf.mkdirs();
+        File op = new File(bf, aname);
+        byte[] buffer;
+        Log.i("luaj", "bin: " + op);
+        try {
+            ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(op));
 
-                    if (z.getName().equals("resources.arsc")) {
+            File[] fs = new File(mDir).listFiles();
+            for (File f : fs) {
+                addZip(zip, f, "assets");
+            }
+
+            ZipFile zf = new ZipFile(context.getPackageCodePath());
+            Enumeration<? extends ZipEntry> es = zf.entries();
+            while (es.hasMoreElements()) {
+                ZipEntry z = es.nextElement();
+                if (z.getName().startsWith("assets")) continue;
+
+                if (z.getName().equals("resources.arsc")) {
+                    InputStream inputStream = zf.getInputStream(z);
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    buffer = new byte[4096];
+                    int bytesRead;
+                    CRC32 crc32 = new CRC32();
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        bos.write(buffer, 0, bytesRead);
+                        crc32.update(buffer, 0, bytesRead);
+                    }
+                    byte[] fileData = bos.toByteArray();
+                    inputStream.close();
+                    ZipEntry newEntry = new ZipEntry(z.getName());
+                    newEntry.setMethod(ZipOutputStream.STORED);
+                    newEntry.setSize(fileData.length);
+                    newEntry.setCompressedSize(fileData.length);
+                    newEntry.setCrc(crc32.getValue());
+
+                    zip.putNextEntry(newEntry);
+                    zip.write(fileData);
+                } else {
+                    zip.putNextEntry(new ZipEntry(z.getName()));
+                    if (z.getName().equals("AndroidManifest.xml")) {
                         InputStream inputStream = zf.getInputStream(z);
-                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                        buffer = new byte[4096];
-                        int bytesRead;
-                        CRC32 crc32 = new CRC32();
-                        while ((bytesRead = inputStream.read(buffer)) != -1) {
-                            bos.write(buffer, 0, bytesRead);
-                            crc32.update(buffer, 0, bytesRead);
+                        if (!new File("/storage/emulated/0/Luaide/Manifest/" + amph).exists()) {
+                            new File("/storage/emulated/0/Luaide/Manifest/" + amph).mkdir();
                         }
-                        byte[] fileData = bos.toByteArray();
+                        OutputStream outputStream = new FileOutputStream("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml");
+                        buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = inputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
+                        outputStream.close();
                         inputStream.close();
-                        ZipEntry newEntry = new ZipEntry(z.getName());
-                        newEntry.setMethod(ZipOutputStream.STORED);
-                        newEntry.setSize(fileData.length);
-                        newEntry.setCompressedSize(fileData.length);
-                        newEntry.setCrc(crc32.getValue());
-
-                        zip.putNextEntry(newEntry);
-                        zip.write(fileData);
-                    } else {
-                        zip.putNextEntry(new ZipEntry(z.getName()));
-                        if (z.getName().equals("AndroidManifest.xml")) {
-                            InputStream inputStream = zf.getInputStream(z);
-                            if (!new File("/storage/emulated/0/Luaide/Manifest/" + amph).exists()){
-                                new File("/storage/emulated/0/Luaide/Manifest/" + amph).mkdir();
-                            }
-                            OutputStream outputStream = new FileOutputStream("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml");
-                            buffer = new byte[1024];
-                            int bytesRead;
-                            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                                outputStream.write(buffer, 0, bytesRead);
-                            }
-                            outputStream.close();
-                            inputStream.close();
-                            editorXml("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", aname, pkg, Integer.parseInt(code), ver);
-                            setProvider("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", pkg);
-                            try {
-                                for (int i = 0; i < ps.length; i++) {
-                                    //System.out.println(ps[i]);
-                                    setPermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", ps[i], false);
-                                }
-                                for (int i = 0; i < repomission.length; i++) {
-                                    setPermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", repomission[i], true);
-                                }
-                                edpermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml",pkg);
-                            } catch (Exception e) {
-                                System.out.println(e.getMessage());
-                            }
+                        editorXml("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", aname, pkg, Integer.parseInt(code), ver);
+                        setProvider("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", pkg);
+                        try {
                             for (int i = 0; i < ps.length; i++) {
-                                System.out.println(ps[i]);
+                                //System.out.println(ps[i]);
                                 setPermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", ps[i], false);
                             }
-                            setPermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", pkg + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", false);
-
-                            FileInputStream fis = new FileInputStream(new File("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml"));
-                            byte[] bytes = new byte[1024];
-                            int length;
-                            while ((length = fis.read(bytes)) >= 0) {
-                                zip.write(bytes, 0, length);
+                            for (int i = 0; i < repomission.length; i++) {
+                                setPermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", repomission[i], true);
                             }
-                            fis.close();
-                        } else {
-                            if (z.getName().endsWith("icon.png")) {
-                                if (new File(mDir + "/icon.png").exists()) {
-                                    LuaUtil.copyFile(new FileInputStream(mDir + "/icon.png"), zip);
-                                }else {
-                                    LuaUtil.copyFile(zf.getInputStream(z), zip);
-                                }
+                            edpermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", pkg);
+                        } catch (Exception e) {
+                            System.out.println(e.getMessage());
+                        }
+                        for (int i = 0; i < ps.length; i++) {
+                            System.out.println(ps[i]);
+                            setPermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", ps[i], false);
+                        }
+                        setPermission("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml", pkg + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", false);
+
+                        FileInputStream fis = new FileInputStream(new File("/storage/emulated/0/Luaide/Manifest/" + amph + "/AndroidManifest.xml"));
+                        byte[] bytes = new byte[1024];
+                        int length;
+                        while ((length = fis.read(bytes)) >= 0) {
+                            zip.write(bytes, 0, length);
+                        }
+                        fis.close();
+                    } else {
+                        if (z.getName().endsWith("icon.png")) {
+                            if (new File(mDir + "/icon.png").exists()) {
+                                LuaUtil.copyFile(new FileInputStream(mDir + "/icon.png"), zip);
                             } else {
                                 LuaUtil.copyFile(zf.getInputStream(z), zip);
                             }
+                        } else {
+                            LuaUtil.copyFile(zf.getInputStream(z), zip);
                         }
                     }
                 }
-
-                zf.close();
-                zip.closeEntry();
-                zip.close();
-                try {
-                    RandomAccessFile zipFile = new RandomAccessFile(op.getAbsolutePath(), "r");
-                    FileOutputStream zipOut = new FileOutputStream(op.getAbsolutePath() + "s.apk");
-                    com.iyxan23.zipalignjava.ZipAlign.alignZip(zipFile, zipOut, 4, 4096);
-                    zipFile.close();
-                    zipOut.close();
-                    //System.out.println("4k");
-                } catch (IOException | com.iyxan23.zipalignjava.InvalidZipException e) {
-                    e.printStackTrace();
-                }
-                //apksigner.Main.sign(op.getAbsolutePath() + "s.apk", op.getAbsolutePath() + ".apk");
-                copyAssetFileToExternal(context,"release_key.jks","/storage/emulated/0/Luaide/Manifest/");
-                signerApk("/storage/emulated/0/Luaide/Manifest/release_key.jks","hhh12345","yan","hhh12345",op.getAbsolutePath() + "s.apk",op.getAbsolutePath() + ".apk");
-                new File(op.getAbsolutePath() + "s.apk").delete();
-                Log.i("luaj", "bin: finish " + op);
-                return op.getAbsolutePath() + ".apk";
-            } catch (Exception e) {
-                System.out.println(e.getMessage());
-                return "error:" + e.getMessage();
-            } finally {
-                op.delete();
             }
+
+            zf.close();
+            zip.closeEntry();
+            zip.close();
+            try {
+                RandomAccessFile zipFile = new RandomAccessFile(op.getAbsolutePath(), "r");
+                FileOutputStream zipOut = new FileOutputStream(op.getAbsolutePath() + "s.apk");
+                com.iyxan23.zipalignjava.ZipAlign.alignZip(zipFile, zipOut, 4, 4096);
+                zipFile.close();
+                zipOut.close();
+                //System.out.println("4k");
+            } catch (IOException | com.iyxan23.zipalignjava.InvalidZipException e) {
+                e.printStackTrace();
+            }
+            //apksigner.Main.sign(op.getAbsolutePath() + "s.apk", op.getAbsolutePath() + ".apk");
+            copyAssetFileToExternal(context, "release_key.jks", "/storage/emulated/0/Luaide/Manifest/");
+            signerApk("/storage/emulated/0/Luaide/Manifest/release_key.jks", "hhh12345", "yan", "hhh12345", op.getAbsolutePath() + "s.apk", op.getAbsolutePath() + ".apk");
+            new File(op.getAbsolutePath() + "s.apk").delete();
+            Log.i("luaj", "bin: finish " + op);
+            return op.getAbsolutePath() + ".apk";
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return "error:" + e.getMessage();
+        } finally {
+            op.delete();
         }
+    }
 
 
-        private static void addZip( ZipOutputStream zip, File dir, String root) {
+    private static void addZip(ZipOutputStream zip, File dir, String root) {
         Log.i("luaj", "addZip: " + root + ";" + dir);
         if (dir.getName().startsWith("."))
             return;
@@ -1012,7 +1038,7 @@ public class LuaUtil {
         if (dir.isDirectory()) {
             File[] fs = dir.listFiles();
             for (File f : fs) {
-                addZip( zip, f, name);
+                addZip(zip, f, name);
             }
         } else {
             try {
@@ -1020,13 +1046,13 @@ public class LuaUtil {
             } catch (IOException e) {
 
             }
-                try {
-                    byte[] b = LuaUtil.readAllf(dir.getAbsolutePath());
-                    zip.write(b, 0, b.length);
-                    zip.flush();
-                } catch (IOException e) {
+            try {
+                byte[] b = LuaUtil.readAllf(dir.getAbsolutePath());
+                zip.write(b, 0, b.length);
+                zip.flush();
+            } catch (IOException e) {
 
-                }
+            }
         }
     }
 
@@ -1128,11 +1154,11 @@ public class LuaUtil {
             ProviderEditor.EditorInfo editorInfo = new ProviderEditor.EditorInfo();
             editorInfo.with(new ProviderEditor.ProviderOpera(
                     "androidx.startup.InitializationProvider",
-                    pkg+".androidx-startup"
+                    pkg + ".androidx-startup"
             ).update());
             editorInfo.with(new ProviderEditor.ProviderOpera(
                     "android.content.FileProvider",
-                    pkg+".provider"
+                    pkg + ".provider"
             ).update());
             ProviderEditor providerEditor = new ProviderEditor(aXMLDoc);
             providerEditor.setEditorInfo(editorInfo);
@@ -1150,13 +1176,13 @@ public class LuaUtil {
 
     }
 
-    public static void edpermission(String path,String pkg){
+    public static void edpermission(String path, String pkg) {
         try {
             AXMLDoc aXMLDoc = new AXMLDoc();
             aXMLDoc.parse(new FileInputStream(path));
 
             PermissionTagEditor.EditorInfo editorInfo = new PermissionTagEditor.EditorInfo();
-            PermissionTagEditor.PermissionOperation addOperation = new PermissionTagEditor.PermissionOperation(pkg+".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION").add();
+            PermissionTagEditor.PermissionOperation addOperation = new PermissionTagEditor.PermissionOperation(pkg + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION").add();
             PermissionTagEditor.PermissionOperation removeOperation = new PermissionTagEditor.PermissionOperation("com.yan.luaide.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION").remove();
             editorInfo.with(addOperation).with(removeOperation);
 
@@ -1205,7 +1231,7 @@ public class LuaUtil {
              OutputStream out = new FileOutputStream(destinationPath)) {
             byte[] buffer = new byte[1024];
             int read;
-            while ((read = in.read(buffer))!= -1) {
+            while ((read = in.read(buffer)) != -1) {
                 out.write(buffer, 0, read);
             }
         } catch (IOException e) {

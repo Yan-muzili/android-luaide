@@ -1017,7 +1017,104 @@ public class Editor extends AppCompatActivity implements View.OnClickListener {
         startActivity(intent);
     }
 
+    /**
+     * 文件选择器
+     */
+    File currentDirectory = new File(String.valueOf(Environment.getExternalStorageDirectory()));
 
+    private void showFileChooserDialog() {
+        // 获取当前目录下的所有文件和文件夹
+        final List<String> fileNames = new ArrayList<>();
+        final List<String> filePaths = new ArrayList<>();
+        listFiles(currentDirectory, fileNames, filePaths);
+        // 将文件名和文件路径转换为File对象列表
+        List<File> files = new ArrayList<>();
+        for (String path : filePaths) {
+            files.add(new File(path));
+        }
+
+        // 自定义比较器，确保文件夹在文件之前
+        Comparator<File> customComparator =
+                (file1, file2) -> {
+                    boolean isDir1 = file1.isDirectory();
+                    boolean isDir2 = file2.isDirectory();
+
+                    // 如果两个都是文件夹或都是文件，按名称排序
+                    if (isDir1 == isDir2) {
+                        return file1.getName().compareToIgnoreCase(file2.getName());
+                    }
+
+                    // 如果一个是文件夹，另一个是文件，则文件夹排在前面
+                    return isDir1 ? -1 : 1;
+                };
+
+        // 对File对象列表进行排序
+        Collections.sort(files, customComparator);
+
+        // 将排序后的File对象列表转回String列表
+        List<String> sortedFileNames = new ArrayList<>();
+        List<String> sortedFilePaths = new ArrayList<>();
+        for (File file : files) {
+            sortedFileNames.add(file.getName());
+            sortedFilePaths.add(file.getPath());
+        }
+        // 创建文件选择对话框
+        // Toast.makeText(MainActivity.this,"",Toast.);
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
+        builder
+                .setTitle("选择文件")
+                .setItems(
+                        sortedFileNames.toArray(new String[0]),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                // 用户点击文件时的处理逻辑
+                                String selectedFilePath = sortedFilePaths.get(which);
+                                File selectedFile = new File(selectedFilePath);
+                                if (selectedFile.isDirectory()) {
+                                    // 如果是文件夹，则进入文件夹
+                                    currentDirectory = selectedFile;
+                                    showFileChooserDialog(); // 递归显示文件选择对话框
+                                } else {
+                                    // 如果是文件，则处理文件的逻辑，例如打开文件等
+                                    Toast.makeText(Editor.this, "选择了文件：" + selectedFilePath, Toast.LENGTH_SHORT)
+                                            .show();
+                                    try {
+                                        Intent intent1 = new Intent(Editor.this, Editor.class);
+                                        intent1.putExtra("mdir", selectedFilePath);
+                                        startActivity(intent1);
+                                        finish();
+                                    } catch (Exception e) {
+                                        YanDialog.show(Editor.this, "error", e.getMessage());
+                                    }
+                                }
+                            }
+                        })
+                .setNegativeButton(
+                        "返回上层",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                // 用户点击返回上层时的处理逻辑
+                                if (!currentDirectory.equals(Environment.getExternalStorageDirectory())) {
+                                    currentDirectory = currentDirectory.getParentFile();
+                                    showFileChooserDialog(); // 递归显示文件选择对话框
+                                }
+                            }
+                        })
+                .setNeutralButton(
+                        "取消",
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                // 用户点击取消时的处理逻辑
+                                dialog.dismiss();
+                                // 结束Activity
+                            }
+                        });
+        final AlertDialog alertDialog = builder.create();
+        alertDialog.show();
+    }
 
     /**
      *

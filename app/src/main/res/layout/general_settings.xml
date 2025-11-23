@@ -29,4 +29,20 @@
         android:layout_marginRight="16dp"
         android:id="@+id/general_set_list"
         />
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginRight="16dp"
+        android:layout_marginTop="25dp"
+        android:text="功能"
+        />
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginRight="16dp"
+        android:textSize="16sp"
+        android:textColor="?attr/colorOnSurface"
+        android:text="PerfPlus"/>
 </LinearLayout>

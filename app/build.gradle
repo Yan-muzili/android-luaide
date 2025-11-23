@@ -5,17 +5,19 @@ plugins {
 
 android {
     namespace 'com.yan.luaide'
+    buildFeatures {aidl true}
     compileSdk 35
     defaultConfig {
         applicationId "com.yan.luaide"
         minSdk 21
-        targetSdk 33
+        targetSdk 35
         versionCode 1
         versionName "1.2_alpha2"
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
     }
     signingConfigs {
         release {
@@ -39,7 +41,11 @@ android {
         }
     }
 
-
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -53,7 +59,10 @@ android {
         ndkBuild {
             path 'src/main/jni/android.mk'
         }
+
+
     }
+
     tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
         kotlinOptions {
             jvmTarget = "17"
@@ -64,10 +73,10 @@ android {
 }
 
 dependencies {
+    //implementation project(':luaide-lualanguage')
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.3'
     implementation libs.zipalign
     implementation(platform(libs.sora.editor.bom))
-    implementation libs.sora.editor
     implementation libs.appcompat
     implementation libs.material
     testImplementation libs.junit
@@ -76,7 +85,15 @@ dependencies {
     implementation libs.support
     implementation libs.nav.fragment
     implementation libs.nav.ui
+    implementation libs.libsu.core
+    implementation libs.libsu.io
+    implementation(libs.libsu.nio)
+    implementation(libs.libsu.service)
     implementation(project(":colorpick"))
     implementation(project(":signer"))
+    implementation(project(":editor"))
+    implementation libs.android.multi.theme
+    implementation 'com.android.tools:r8:8.5.35'
+    implementation(libs.okhttp)
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 }

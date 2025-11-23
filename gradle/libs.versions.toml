@@ -1,5 +1,6 @@
 [versions]
 agp = "8.8.2"
+androidMultiTheme = "1.0.0"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
@@ -10,7 +11,11 @@ kotlin="2.0.20"
 nav="2.6.0"
 sora-editor = "0.23.5"
 zipalign="1.2.1"
+libsu="5.2.2"
+androidxAnnotation = "1.9.1"
+okhttp="4.12.0"
 [libraries]
+android-multi-theme = { module = "io.github.leonhover:android-multi-theme", version.ref = "androidMultiTheme" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.15.0" }
 ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -24,9 +29,17 @@ nav-ui={group="androidx.navigation",name="navigation-ui",version.ref="nav"}
 sora-editor-bom = { group = "io.github.Rosemoe.sora-editor", name = "bom", version.ref = "sora-editor" }
 sora-editor = { group = "io.github.Rosemoe.sora-editor", name = "editor" }
 zipalign={group="com.github.iyxan23",name="zipalign-java",version.ref="zipalign"}
-
+libsu-core = { group = "com.github.topjohnwu.libsu", name = "core", version.ref = "libsu" }
+libsu-service = { group = "com.github.topjohnwu.libsu", name = "service", version.ref = "libsu" }
+libsu-io = { group = "com.github.topjohnwu.libsu", name = "io", version.ref = "libsu" }
+libsu-nio = { group = "com.github.topjohnwu.libsu", name = "nio", version.ref = "libsu" }
+androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "androidxAnnotation" }
+androidx-collection = { module = "androidx.collection:collection", version = "1.5.0" }
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+okhttp={group="com.squareup.okhttp3",name="okhttp",version.ref="okhttp"}
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-kotlin={id="org.jetbrains.kotlin.android",version.ref="kotlin"}
 android-library = { id = "com.android.library", version.ref = "agp" }
+publish = { id = "com.vanniktech.maven.publish.base", version = "0.30.0" }
 

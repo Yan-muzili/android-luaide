@@ -1,0 +1,19 @@
+<resources>
+    <array name="light_themes">
+        <item>@style/Theme.AndroidIDE.BlueWave</item>
+        <item>@style/Theme.AndroidIDE.SunnyGlow</item>
+        <item>@style/Theme.Material3.Blue.NoActionBar</item>
+        <item>@style/Theme.Material3.Green.NoActionBar</item>
+        <item>@style/Theme.Material3.Orange.NoActionBar</item>
+        <item>@style/Theme.Material3.Brown.NoActionBar</item>
+    </array>
+
+    <array name="dark_themes">
+        <item>@style/Theme.AndroidIDE.BlueWave.Dark</item>
+        <item>@style/Theme.AndroidIDE.SunnyGlow.Dark</item>
+        <item>@style/Theme.Material3.Blue.Dark.NoActionBar</item>
+        <item>@style/Theme.Material3.Green.Dark.NoActionBar</item>
+        <item>@style/Theme.Material3.Orange.Dark.NoActionBar</item>
+        <item>@style/Theme.Material3.Brown.Dark.NoActionBar</item>
+    </array>
+</resources>

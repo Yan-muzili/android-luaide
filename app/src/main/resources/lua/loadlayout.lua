@@ -20,15 +20,15 @@ local dm, W, H = context.getResources().getDisplayMetrics(), getMetrics(context)
 local alyloader = function(path)
   local alypath = package.path:gsub("%.lua;", ".aly;")
   local path, msg = package.searchpath(path, alypath)
-  if msg return msg end
+  if msg then return msg end
   local f = io.open(path)
   local s = f:read("*a")
   f:close()
-  if string.sub(s, 1, 4) == "\27Lua"
+  if string.sub(s, 1, 4) == "\27Lua" then
     return assert(loadfile(path)), path
    else
     local f, st = loadstring("return " .. s, path:match("[^/]+/[^/]+$"), "bt")
-    if st error(st:gsub("%b[]", path, 1), 0) end
+    if st then error(st:gsub("%b[]", path, 1), 0) end
     return f, st
   end
 end
@@ -211,8 +211,8 @@ local function split(s, t)
   local l = #s
   return function()
     local i = s:find(t, idx)
-    if idx >= l return nil end
-    if not i i = l + 1 end
+    if idx >= l then return nil end
+    if not i then i = l + 1 end
     local sub = s:sub(idx, i - 1)
     idx = i + 1
     return sub
@@ -221,8 +221,8 @@ end
 
 local function checkint(s)
   local ret = 0
-  for n in s:gmatch("[^|]+")
-    if toint[n]
+  for n in s:gmatch("[^|]+") do
+    if toint[n] then
       ret = ret | toint[n]
      else
       return nil
@@ -232,31 +232,31 @@ local function checkint(s)
 end
 
 local function checkNumber(var)
-  if type(var) == "string"
-    if var=="true"
+  if type(var) == "string" then
+    if var=="true" then
       return true
-     elseif var=="false"
+     elseif var=="false" then
       return false
     end
-    if toint[var]
+    if toint[var] then
       return toint[var]
     end
     local p = checkPercent(var)
-    if p
+    if p then
       return p
     end
     local i = checkint(var)
-    if i
+    if i then
       return i
     end
     local h = string.match(var,"^#(%x+)$")
-    if h
+    if h then
       local c = tonumber(h,16)
-      if c
-        if #h<=6
+      if c then
+        if #h<=6 then
           return c-0x1000000
-         elseif #h<=8
-          if c>0x7fffffff
+         elseif #h<=8 then
+          if c>0x7fffffff then
             return c-0x100000000
            else
             return c
@@ -265,7 +265,7 @@ local function checkNumber(var)
       end
     end
     local n,ty = checkType(var)
-    if ty
+    if ty then
       return TypedValue.applyDimension(ty,n,dm)
     end
   end
@@ -277,7 +277,7 @@ end
 
 local function checkValues(...)
   local vars = { ... }
-  for n = 1, #vars
+  for n = 1, #vars do
     vars[n] = checkValue(vars[n])
   end
   return unpack(vars)
@@ -289,7 +289,7 @@ end
 
 local function checkattr(s)
   local e, s = pcall(getattr, s)
-  if e
+  if e then
     return s
   end
   return nil
@@ -301,8 +301,8 @@ end
 
 local function dump2(t)
   local _t = {tostring(t), "\t{"}
-  for k, v in pairs(t)
-    if type(v) == "table"
+  for k, v in pairs(t) do
+    if type(v) == "table" then
       table.insert(_t, "\t\t" .. tostring(k) .. "={" .. tostring(v[1]) .. " ...}")
      else
       table.insert(_t, "\t\t" .. tostring(k) .. "=" .. tostring(v))
@@ -315,7 +315,7 @@ end
 local ver = bindClass "android.os.Build".VERSION.SDK_INT
 
 local function setBackground(view, bg)
-  if ver < 16
+  if ver < 16 then
     view.setBackgroundDrawable(bg)
    else
     view.setBackground(bg)
@@ -323,35 +323,35 @@ local function setBackground(view, bg)
 end
 
 local function setattribute(root, view, params, k, v, ids)
-  if k == "layout_x"
+  if k == "layout_x" then
     params.x = checkValue(v)
 
-   elseif k == "layout_y"
+   elseif k == "layout_y" then
     params.y = checkValue(v)
 
-   elseif k=="w"
+   elseif k=="w" then
     params.width=checkValue(v)
 
-   elseif k=="h"
+   elseif k=="h" then
     params.height=checkValue(v)
 
-   elseif k == "layout_scrollFlags"
+   elseif k == "layout_scrollFlags" then
     params.setScrollFlags(checkValue(v))
 
-   elseif k == "layout_weight"
+   elseif k == "layout_weight" then
     params.weight = checkValue(v)
 
-   elseif k == "layout_gravity"
+   elseif k == "layout_gravity" then
     params.gravity = checkValue(v)
 
-   elseif k == "layout_marginStart"
+   elseif k == "layout_marginStart" then
     params.setMarginStart(checkValue(v))
 
-   elseif k == "layout_marginEnd"
+   elseif k == "layout_marginEnd" then
     params.setMarginEnd(checkValue(v))
 
-   elseif k=="behavior_hideable"
-    if params.getBehavior()
+   elseif k=="behavior_hideable" then
+    if params.getBehavior() then
       params.getBehavior().setHideable(checkValue(v))
      else
       task(1,function()
@@ -359,8 +359,8 @@ local function setattribute(root, view, params, k, v, ids)
       end)
     end
 
-   elseif k=="behavior_skipCollapsed"
-    if params.getBehavior()
+   elseif k=="behavior_skipCollapsed" then
+    if params.getBehavior() then
       params.getBehavior().setSkipCollapsed(checkValue(v))
      else
       task(1,function()
@@ -368,58 +368,58 @@ local function setattribute(root, view, params, k, v, ids)
       end)
     end
 
-   elseif k=="layout_collapseMode"
+   elseif k=="layout_collapseMode" then
     params.setCollapseMode(checkValue(v))
 
-   elseif k=="layout_collapseParallaxMultiplier"
+   elseif k=="layout_collapseParallaxMultiplier" then
     params.setParallaxMultiplier(checkValue(v))
 
-   elseif k=="layout_anchor"
+   elseif k=="layout_anchor" then
     params.setAnchorId(ids[v])
 
-   elseif k=="layout_behavior"
-    if tostring(v) == "@string/appbar_scrolling_view_behavior" or tostring(v) == "appbar_scrolling_view_behavior"
+   elseif k=="layout_behavior" then
+    if tostring(v) == "@string/appbar_scrolling_view_behavior" or tostring(v) == "appbar_scrolling_view_behavior" then
       local ScrollingViewBehavior = newInstance "com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior"
       params.setBehavior(ScrollingViewBehavior)
-     elseif tostring(v) == "@string/bottom_sheet_behavior" or tostring(v) == "bottom_sheet_behavior"
+     elseif tostring(v) == "@string/bottom_sheet_behavior" or tostring(v) == "bottom_sheet_behavior" then
       local mBottomSheetBehavior = newInstance "com.google.android.material.bottomsheet.BottomSheetBehavior"
       params.setBehavior(mBottomSheetBehavior)
      else
       params.setBehavior(checkValue(v))
     end
 
-   elseif rules[k] and (v == true or v == "true")
+   elseif rules[k] and (v == true or v == "true") then
     params.addRule(rules[k])
 
-   elseif rules[k]
+   elseif rules[k] then
     params.addRule(rules[k], ids[v])
 
-   elseif k == "TooltipText" or k == "tooltipText"
+   elseif k == "TooltipText" or k == "tooltipText" then
     TooltipCompat.setTooltipText(view, v)
 
-   elseif k == "items"
-    if type(v) == "table"
+   elseif k == "items" then
+    if type(v) == "table" then
 
-      if view.adapter
+      if view.adapter then
         view.adapter.addAll(v)
        else
         local adapter = ArrayListAdapter(context, android_R.layout.simple_list_item_1, String(v))
         view.setAdapter(adapter)
       end
 
-     elseif type(v) == "function"
+     elseif type(v) == "function" then
 
-      if view.adapter
+      if view.adapter then
         view.adapter.addAll(v())
        else
         local adapter = ArrayListAdapter(context, android_R.layout.simple_list_item_1, String(v()))
         view.setAdapter(adapter)
       end
 
-     elseif type(v) == "string"
+     elseif type(v) == "string" then
 
       local v = rawget(root, v) or rawget(_G, v)
-      if view.adapter
+      if view.adapter then
         view.adapter.addAll(v())
        else
         local adapter = ArrayListAdapter(context, android_R.layout.simple_list_item_1, String(v()))
@@ -427,12 +427,12 @@ local function setattribute(root, view, params, k, v, ids)
       end
     end
 
-   elseif k == "pages" and type(v) == "table"
+   elseif k == "pages" and type(v) == "table" then
     local success, err =pcall(function()
       local views = ArrayList()
-      for n, o in ipairs(v)
+      for n, o in ipairs(v) do
         local tp = type(o)
-        if tp == "string" or tp == "table"
+        if tp == "string" or tp == "table" then
           views.add(loadlayout(o, root))
          else
           views.add(o)
@@ -442,9 +442,9 @@ local function setattribute(root, view, params, k, v, ids)
       end)
       if not success then
       local ps = {}
-      for n,o in ipairs(v)
+      for n,o in ipairs(v) do
         local tp = type(o)
-        if tp == "string" or tp == "table"
+        if tp == "string" or tp == "table" then
           table.insert(ps,loadlayout(o,root))
          else
           table.insert(ps,o)
@@ -454,11 +454,11 @@ local function setattribute(root, view, params, k, v, ids)
       view.setAdapter(adapter)
     end
 
-   elseif k=="pagesWithTitle" and type(v)=="table"
+   elseif k=="pagesWithTitle" and type(v)=="table" then
     local list={}
-    for n,o in ipairs(v[1])
+    for n,o in ipairs(v[1]) do
       local tp=type(o)
-      if tp=="string" or tp=="table"
+      if tp=="string" or tp=="table" then
         list[n]=loadlayout(o,root)
        else
         list[n]=o
@@ -466,12 +466,12 @@ local function setattribute(root, view, params, k, v, ids)
     end
     view.setAdapter(BasePagerAdapter(list,v[2]))
 
-   elseif k == "textSize"
-    if tonumber(v)
+   elseif k == "textSize" then
+    if tonumber(v) then
       view.setTextSize(tonumber(v))
-     elseif type(v) == "string"
+     elseif type(v) == "string" then
       local n, ty = checkType(v)
-      if ty
+      if ty then
         view.setTextSize(ty, n)
        else
         view.setTextSize(v)
@@ -480,99 +480,99 @@ local function setattribute(root, view, params, k, v, ids)
       view.setTextSize(v)
     end
 
-   elseif k == "textStyle"
+   elseif k == "textStyle" then
 
     local Typeface = bindClass "android.graphics.Typeface"
 
-    if v=="bold"
+    if v=="bold" then
       local bold = Typeface.defaultFromStyle(Typeface.BOLD)
       view.setTypeface(bold)
-     elseif v=="normal"
+     elseif v=="normal" then
       local normal = Typeface.defaultFromStyle(Typeface.NORMAL)
       view.setTypeface(normal)
-     elseif v=="italic"
+     elseif v=="italic" then
       local italic = Typeface.defaultFromStyle(Typeface.ITALIC)
       view.setTypeface(italic)
-     elseif v=="italic|bold" or v=="bold|italic"
+     elseif v=="italic|bold" or v=="bold|italic" then
       local bold_italic = Typeface.defaultFromStyle(Typeface.BOLD_ITALIC)
       view.setTypeface(bold_italic)
     end
 
-   elseif k == "textAppearance"
+   elseif k == "textAppearance" then
     view.setTextAppearance(context, checkattr(v))
 
-   elseif k == "ellipsize"
+   elseif k == "ellipsize" then
     view.setEllipsize(TruncateAt[string.upper(v)])
 
-   elseif k == "url"
+   elseif k == "url" then
     view.loadUrl(url)
 
-   elseif k == "src"
+   elseif k == "src" then
     local path = v
-    if not path:find("^/") and path:sub(1, 4) ~= "http"
+    if not path:find("^/") and path:sub(1, 4) ~= "http" then
       local _path = luadir.."/"..path
-      if (_path ~= nil)
+      if (_path ~= nil) then
         path = _path
       end
     end
     Glide.with(this).load(path).into(view)
 
-   elseif k == "scaleType"
+   elseif k == "scaleType" then
     view.setScaleType(ST[scaleType[v]])
 
-   elseif k == "background"
-    if type(v)=="string"
-      if v:find("^%?")
+   elseif k == "background" then
+    if type(v)=="string" then
+      if v:find("^%?") then
         view.setBackgroundResource(getIdentifier(v:sub(2,-1)))
 
-       elseif v:find("^#")
+       elseif v:find("^#") then
         view.setBackgroundColor(checkNumber(v))
 
-       elseif rawget(root,v) or rawget(_G,v)
+       elseif rawget(root,v) or rawget(_G,v) then
         v=rawget(root,v) or rawget(_G,v)
-        if type(v)=="function"
+        if type(v)=="function" then
           view.setBackground(LuaDrawable(v))
 
-         elseif type(v)=="userdata"
+         elseif type(v)=="userdata" then
           view.setBackground(v)
 
         end
        else
-        if (not v:find("^/")) and luadir
+        if (not v:find("^/")) and luadir then
           v=luadir..v
         end
-        if v:find("%.9%.png")
+        if v:find("%.9%.png") then
           view.setBackground(NineBitmapDrawable(loadbitmap(v)))
          else
           view.setBackground(LuaBitmapDrawable(context,v))
         end
       end
 
-     elseif type(v)=="userdata"
+     elseif type(v)=="userdata" then
       view.setBackground(v)
 
-     elseif type(v)=="number"
+     elseif type(v)=="number" then
       view.setBackground(v)
 
     end
 
-   elseif k == "onClick"
+   elseif k == "onClick" then
     local listener
-    if type(v) == "function"
+    if type(v) == "function" then
       listener = OnClickListener { onClick = v }
 
-     elseif type(v) == "userdata"
+     elseif type(v) == "userdata" then
       listener = v
 
-     elseif type(v) == "string"
-      if ltrs[v]
+     elseif type(v) == "string" then
+      if ltrs[v] then
         listener = ltrs[v]
        else
         local l = rawget(root, v) or rawget(_G, v)
-        if type(l) == "function"
+        if type(l) == "function" then
           listener = OnClickListener { onClick = l }
 
-         elseif type(l) == "userdata"
+         elseif type(l) == "userdata" then
           listener = l
 
          else
@@ -583,23 +583,23 @@ local function setattribute(root, view, params, k, v, ids)
     end
     view.setOnClickListener(listener)
 
-   elseif k=="onLongClick"
+   elseif k=="onLongClick" then
     local listener
-    if type(v)=="function"
+    if type(v)=="function" then
       listener=OnLongClickListener{ onLongClick=v }
 
-     elseif type(v)=="userdata"
+     elseif type(v)=="userdata" then
       listener=v
 
-     elseif type(v)=="string"
-      if ltrs[v]
+     elseif type(v)=="string" then
+      if ltrs[v] then
         listener=ltrs[v]
        else
         local l=rawget(root,v) or rawget(_G,v)
-        if type(l)=="function"
+        if type(l)=="function" then
           listener=OnLongClickListener{ onLongClick=l }
 
-         elseif type(l)=="userdata"
+         elseif type(l)=="userdata" then
           listener=l
 
          else
@@ -610,37 +610,36 @@ local function setattribute(root, view, params, k, v, ids)
     end
     view.setOnLongClickListener(listener)
 
-   elseif k == "password" and (v == "true" or v == true)
+   elseif k == "password" and (v == "true" or v == true) then
     view.setInputType(0x81)
 
-   elseif type(k) == "string" and not (k:find("layout_")) and not (k:find("padding")) and k ~= "style"
+   elseif type(k) == "string" and not (k:find("layout_")) and not (k:find("padding")) and k ~= "style" then
     k = string.gsub(k, "^(%w)", function(s) return string.upper(s) end)
-    if k == "Text" or k == "Title" or k == "Subtitle"
+    if k == "Text" or k == "Title" or k == "Subtitle" then
       view["set" .. k](v)
-     elseif not k:find("^On") and not k:find("^Tag") and type(v) == "table"
+     elseif not k:find("^On") and not k:find("^Tag") and type(v) == "table" then
       view["set" .. k](checkValues(unpack(v)))
      else
       view["set" .. k](checkValue(v))
     end
   end
-
 end
 
 local function setstyle(c, t, root, view, params, ids)
-  if not t or type(t) ~= "table"
+  if not t or type(t) ~= "table" then
     return
   end
   local mt = getmetatable(t)
-  if not mt or not mt.__index
+  if not mt or not mt.__index then
     return
   end
   local m = mt.__index
-  if c[m]
+  if c[m] then
     return
   end
   c[m] = true
-  for k, v in pairs(m)
-    if not rawget(c, k)
+  for k, v in pairs(m) do
+    if not rawget(c, k) then
       pcall(setattribute, root, view, params, k, v, ids)
     end
     c[k] = true
@@ -649,9 +648,9 @@ local function setstyle(c, t, root, view, params, ids)
 end
 
 local function loadlayout(t, root, group)
-  if type(t) == "string"
+  if type(t) == "string" then
     t = require(t)
-   elseif type(t) ~= "table"
+   elseif type(t) ~= "table" then
     error(string.format(
     "loadlayout error: First value must be a table, checked import layout.", 0
     ))
@@ -661,14 +660,14 @@ local function loadlayout(t, root, group)
 
   local view, style
 
-  if t.style
-    if type(t.style) == "number"
+  if t.style then
+    if type(t.style) == "number" then
       style = t.style
-     elseif t.style:find("^%?")
+     elseif t.style:find("^%?") then
       style = getIdentifier(t.style:sub(2, -1))
      else
       local st, sty = pcall(require, t.style)
-      if st
+      if st then
         setmetatable(t, { __index = sty })
        else
         style = checkattr(t.style)
@@ -676,18 +675,18 @@ local function loadlayout(t, root, group)
     end
   end
 
-  if not t[1]
+  if not t[1] then
     error(string.format(
     "loadlayout error: First value must be a class, checked import package.\n\tat %s", dump2(t)
     ), 0)
   end
 
-  if luajava.instanceof(t[1], View)
+  if luajava.instanceof(t[1], View) then
     view = t[1]
-   elseif type(t[1]) == "number"
+   elseif type(t[1]) == "number" then
     view = activity.layoutInflater.inflate(t[1], nil)
    else
-    if style
+    if style then
       view = t[1](ContextThemeWrapper(context, style), nil, style)
      else
       view = t[1](context)
@@ -699,13 +698,13 @@ local function loadlayout(t, root, group)
   checkValue(t.layout_height) or checkValue(t.h) or -2
   )
 
-  if group
+  if group then
     params = group.LayoutParams(params)
   end
 
   if t.layout_margin or t.layout_marginStart or t.layout_marginEnd or
     t.layout_marginLeft or t.layout_marginTop or t.layout_marginRight or
-    t.layout_marginBottom
+    t.layout_marginBottom then
     params.setMargins(checkValues(
     t.layout_marginLeft or t.layout_margin or 0,
     t.layout_marginTop or t.layout_margin or 0,
@@ -714,10 +713,10 @@ local function loadlayout(t, root, group)
     ))
   end
 
-  if t.padding and type(t.padding) == "table"
+  if t.padding and type(t.padding) == "table" then
     view.setPadding(checkValues(unpack(t.padding)))
    elseif t.padding or t.paddingLeft or t.paddingTop or t.paddingRight or
-    t.paddingBottom
+    t.paddingBottom then
     view.setPadding(checkValues(
     t.paddingLeft or t.padding or 0,
     t.paddingTop or t.padding or 0,
@@ -726,7 +725,7 @@ local function loadlayout(t, root, group)
     ))
   end
 
-  if t.paddingStart or t.paddingEnd
+  if t.paddingStart or t.paddingEnd then
     view.setPaddingRelative(checkValues(
     t.paddingStart or t.padding or 0,
     t.paddingTop or t.padding or 0,
@@ -740,16 +739,16 @@ local function loadlayout(t, root, group)
   setstyle(c, t, root, view, params, ids)
 
   for k, v in pairs(t) do
-    if tonumber(k) and (type(v) == "table" or type(v) == "string")
-      if luajava.instanceof(view, AdapterView)
-        if type(v) == "string"
+    if tonumber(k) and (type(v) == "table" or type(v) == "string") then
+      if luajava.instanceof(view, AdapterView) then
+        if type(v) == "string" then
           v = require(v)
         end
         view.adapter = LuaAdapter(context, v)
        else
         view.addView(loadlayout(v, root, view.getClass()))
       end
-     elseif k == "id"
+     elseif k == "id" then
       rawset(root, v, view)
       local id = ids.id
       ids.id = ids.id + 1
@@ -757,7 +756,7 @@ local function loadlayout(t, root, group)
       ids[v] = id
      else
       local e, s = pcall(setattribute, root, view, params, k, v, ids)
-      if not e
+      if not e then
         local _, i = s:find(":%d+:")
         s = s:sub(i or 1, -1)
         local t, du = pcall(dump2, t)

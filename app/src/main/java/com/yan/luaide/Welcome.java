@@ -100,54 +100,56 @@ public class Welcome extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         SharedPreferences Scheme = getSharedPreferences("EditorSet", Context.MODE_PRIVATE);
         if ((Scheme.getInt("Background", 0) == 0)) {
-            switch (Scheme.getInt("Scheme", 0)) {
-                case 0:
-                    setTheme(R.style.Theme_AndroidIDE_BlueWave);
-                    break;
-                case 1:
-                    setTheme(R.style.Theme_AndroidIDE_SunnyGlow);
-                    break;
-                case 2:
-                    setTheme(R.style.Theme_Material3_Blue_NoActionBar);
-                    break;
-                case 3:
-                    setTheme(R.style.Theme_Material3_Green_NoActionBar);
-                    break;
-                case 4:
-                    setTheme(R.style.Theme_Material3_Orange_NoActionBar);
-                    break;
-                case 5:
-                    setTheme(R.style.Theme_Material3_Brown_NoActionBar);
-                    break;
-                case 6:
-                    DynamicColors.applyToActivitiesIfAvailable(this.getApplication());
-                    break;
-
+            if ((Scheme.getInt("Scheme", -1)) != -1) {
+                switch (Scheme.getInt("Scheme", -1)) {
+                    case 0:
+                        setTheme(R.style.Theme_AndroidIDE_BlueWave);
+                        break;
+                    case 1:
+                        setTheme(R.style.Theme_AndroidIDE_SunnyGlow);
+                        break;
+                    case 2:
+                        setTheme(R.style.Theme_Material3_Blue_NoActionBar);
+                        break;
+                    case 3:
+                        setTheme(R.style.Theme_Material3_Green_NoActionBar);
+                        break;
+                    case 4:
+                        setTheme(R.style.Theme_Material3_Orange_NoActionBar);
+                        break;
+                    case 5:
+                        setTheme(R.style.Theme_Material3_Brown_NoActionBar);
+                        break;
+                    case 6:
+                        DynamicColors.applyToActivitiesIfAvailable(this.getApplication());
+                        break;
+                }
             }
         } else {
-            switch (Scheme.getInt("Scheme", 0)) {
-                case 0:
-                    setTheme(R.style.Theme_AndroidIDE_BlueWave_Dark);
-                    break;
-                case 1:
-                    setTheme(R.style.Theme_AndroidIDE_SunnyGlow_Dark);
-                    break;
-                case 2:
-                    setTheme(R.style.Theme_Material3_Blue_Dark_NoActionBar);
-                    break;
-                case 3:
-                    setTheme(R.style.Theme_Material3_Green_Dark_NoActionBar);
-                    break;
-                case 4:
-                    setTheme(R.style.Theme_Material3_Orange_Dark_NoActionBar);
-                    break;
-                case 5:
-                    setTheme(R.style.Theme_Material3_Brown_Dark_NoActionBar);
-                    break;
-                case 6:
-                    DynamicColors.applyToActivitiesIfAvailable(this.getApplication());
-                    break;
-
+            if ((Scheme.getInt("Scheme", -1)) != -1) {
+                switch (Scheme.getInt("Scheme", -1)) {
+                    case 0:
+                        setTheme(R.style.Theme_AndroidIDE_BlueWave_Dark);
+                        break;
+                    case 1:
+                        setTheme(R.style.Theme_AndroidIDE_SunnyGlow_Dark);
+                        break;
+                    case 2:
+                        setTheme(R.style.Theme_Material3_Blue_Dark_NoActionBar);
+                        break;
+                    case 3:
+                        setTheme(R.style.Theme_Material3_Green_Dark_NoActionBar);
+                        break;
+                    case 4:
+                        setTheme(R.style.Theme_Material3_Orange_Dark_NoActionBar);
+                        break;
+                    case 5:
+                        setTheme(R.style.Theme_Material3_Brown_Dark_NoActionBar);
+                        break;
+                    case 6:
+                        DynamicColors.applyToActivitiesIfAvailable(this.getApplication());
+                        break;
+                }
             }
         }
 
@@ -213,7 +215,11 @@ public class Welcome extends AppCompatActivity {
             }
             new UpdateTask().execute();
         } else {
-            startActivity();
+            try {
+                startActivity();
+            } catch (RuntimeException e) {
+                System.out.println(e.getMessage());
+            }
         }
     }
 
